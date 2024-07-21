@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include "admin/partials/head.html" %}
+<style>
+</style>
+</head>
+<body>
+    {% include "admin/partials/topbar.html" %}
+
+    <main style="display:flex;flex-direction:row;flex-wrap:nowrap;margin-top:32px;">
+        <div id="sidebar">
+            {% include "admin/partials/sidebar.html" %}
+        </div>
+
+        <div id="workspace">
+            {% if partial == "dashboard" %}
+                {% include "admin/partials/dashboard.html" %}
+            {% elif partial == "users" %}
+                {% include "admin/partials/users.html" %}
+            {% elif partial == "products" %}
+                {% include "admin/partials/products.html" %}
+            {% elif partial == "product" %}
+                {% include "admin/partials/product.html" %}
+            {% endif %}
+        </div>
+    </main>
+
+</body>
+</html>

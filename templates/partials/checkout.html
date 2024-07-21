@@ -1,0 +1,237 @@
+<style>
+form {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+form > section {
+    width: calc(50% - 30px);
+    background-color: #f5f5f5;
+    padding: 10px;
+}
+
+form > section div {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+form > section div > p {
+    display: flex;
+    flex-direction: column;
+    width: calc(50% - 5px);
+}
+
+h2 {
+    margin: 0 0 10px 0;
+}
+
+table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+table th, table td {
+    border-bottom: 1px dashed #757575;
+    padding: 8px;
+}
+
+table th:first-child, table td:first-child {
+    text-align: left;
+}
+table th:last-child, table td:last-child {
+    text-align: right;
+}
+</style>
+
+<form name="checkout" method="post" action="/checkout">
+    <section>
+        <div class="billing">
+            <h2>Billing Details</h2>
+            <div class="billing-details">
+                <p>
+                    <label for="billing-first-name">First Name<sup>*</sup></label>
+                    <input id="billing-first-name" type="text"
+                        name="billing_first_name" value="{{ billing.first_name }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="billing-last-name">Last Name<sup>*</sup></label>
+                    <input id="billing-last-name" type="text"
+                        name="billing_last_name" value="{{ billing.last_name }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="phone">Phone<sup>*</sup></label>
+                    <input id="phone" type="tel"
+                        name="phone" value="{{ billing.phone }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="email">Email<sup>*</sup></label>
+                    <input id="email" type="email"
+                        name="email" value="{{ billing.email }}"
+                        placeholder="" required>
+                </p>
+                <p style="width: 100%;">
+                    <label for="billing-address">Street address<sup>*</sup></label>
+                    <input id="billing-address" type="text"
+                        name="billing_address" value="{{ billing.address }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="billing-postcode">Postcode / ZIP<sup>*</sup></label>
+                    <input id="billing-postcode" type="text"
+                        name="billing_postcode" value="{{ billing.postcode }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="billing-city">Town / City<sup>*</sup></label>
+                    <input id="billing-city" type="text"
+                        name="billing_city" value="{{ billing.city }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="billing-country">Country / Region<sup>*</sup></label>
+                    <select id="billing-country" name="billing_country" required>
+                        <option value="">Select your country</option>
+                        {% for country in countries %}
+                        <option value="{{ country.code }}" {% if country.code == shipping.country_code %}selected{% endif %}>{{ country.name }}</option>
+                        {% endfor %}
+                    </select>
+                </p>
+                <p>
+                    <label for="tax-id-number">Tax Identification Number</label>
+                    <input id="tax-id-number" type="text"
+                        name="tax_id_number" value="{{ billing.tax_id_number }}" placeholder="">
+                </p>
+            </div>
+        </div>
+
+        <div>
+            <p style="display: flex;flex-direction: row;gap: 4px;width: 100%;">
+                <input id="ship-to-different-address" type="checkbox"
+                    name="ship_to_different_address" value="true" {% if ship_to_different_address %}checked{% endif %}>
+                <label for="ship-to-different-address">Ship to a different address?</label>
+            </p>
+        </div>
+
+        <div class="shipping">
+            <h2>Delivery Address</h2>
+            <div class="shipping-details">
+                <p>
+                    <label for="shipping-first-name">First Name<sup>*</sup></label>
+                    <input id="shipping-first-name" type="text"
+                        name="shipping_first_name" value="{{ shipping.first_name }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="shipping-last-name">Last Name<sup>*</sup></label>
+                    <input id="shipping-last-name" type="text"
+                        name="shipping_last_name" value="{{ shipping.last_name }}"
+                        placeholder="" required>
+                </p>
+                <p style="width: 100%;">
+                    <label for="shipping-address">Street address<sup>*</sup></label>
+                    <input id="shipping-address" type="text"
+                        name="shipping_address" value="{{ shipping.address }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="shipping-postcode">Postcode / ZIP<sup>*</sup></label>
+                    <input id="shipping-postcode" type="text"
+                        name="shipping_postcode" value="{{ shipping.postcode }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="shipping-city">Town / City<sup>*</sup></label>
+                    <input id="shipping-city" type="text"
+                        name="shipping_city" value="{{ shipping.city }}"
+                        placeholder="" required>
+                </p>
+                <p>
+                    <label for="shipping-country">Country / Region<sup>*</sup></label>
+                    <select id="shipping-country" name="shipping_country" required>
+                        <option value="">Select your country</option>
+                        {% for country in countries %}
+                        <option value="{{ country.code }}" {% if country.code == shipping.country_code %}selected{% endif %}>{{ country.name }}</option>
+                        {% endfor %}
+                    </select>
+                </p>
+            </div>
+        </div>
+
+        <div>
+            <p style="width: 100%;">
+                <label for="order-comments">Order Notes</label>
+                <textarea id="order-comments"
+                    name="order_comments"
+                    placeholder="Notes about your order, e.g. special notes for delivery."
+                    rows="4" style="resize: none;">{{ order_comments }}</textarea>
+            </p>
+        </div>
+    </section>
+
+    <section>
+        <h2>Your Order</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set_global total = 0.00 %}
+                {% for product in cart %}
+                {% set subtotal = product.price * product.quantity %}
+                <tr>
+                    <td>{{ product.name }} x {{ product.quantity }}</td>
+                    <td>${{ subtotal | round_and_format(places=2) }}</td>
+                </tr>
+                {% set_global total = total + subtotal %}
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td style="font-weight: bold;">Subtotal</td>
+                    <td>${{ total | round_and_format(places=2) }}</td>
+                </tr>
+                <tr>
+                    <td>Shipping <button type="submit" name="calculate_shipping" value="true">{% if shipping_total > 0 %}
+                        Recalculate
+                    {% else %}
+                        Calculate
+                    {% endif %}</button></td>
+                    <td>{% if shipping_total > 0 %}
+                        ${{ shipping_total | round_and_format(places=2) }}
+                    {% else %}
+                        Enter shipping address
+                    {% endif %}</td>
+                </tr>
+                <tr>
+                    <td style="border: none; font-weight: bold;">Total</td>
+                    <td style="border: none;">${{ total | round_and_format(places=2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <ul style="list-style: none; padding: 0;">
+            <li>
+                <input id="payment-method-bacs" type="radio"
+                    name="payment_method" value="bacs" checked>
+                <label for="payment-method-bacs">Direct bank transfer</label>
+            </li>
+        </ul>
+
+        <p style="display: flex;flex-direction: row;gap: 4px;width: 100%;">
+            <input id="terms" type="checkbox" name="terms" value="true" required>
+            <label for="terms">I have read and agree to <a href="#">terms and conditions</a><sup>*</sup></label>
+        </p>
+
+        <button type="submit">Place Order</button>
+    </section>
+</form>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store</title>
+    <link rel="stylesheet" href="/assets/css/store.css?v=2024071901">
+    <style>
+.content {
+    display: flex;
+    gap: 10px;
+    width: 75%;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.pagination {
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    align-items: center;
+}
+
+.box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.box.categories {
+    position: relative;
+    height: 60px;
+}
+
+.box .title {
+    margin: 0;
+}
+
+.box.categories > ul {
+    position: absolute;
+    list-style: none;
+    padding: 0px;
+    margin: 0;
+    border: 1px solid #bdbdbd;
+    background-color: #fff;
+    overflow: auto;
+    width: 90%;
+    max-height: 28px;
+    cursor: pointer;
+    z-index: 10;
+    top: 28px;
+}
+
+.box.categories > ul:hover {
+    max-height: none;
+}
+
+.box.categories > ul > li {
+    padding: 4px;
+    margin: 1px 0;
+    background-color: #eeeeee;
+}
+
+.box.categories > ul > li > a {
+    text-decoration: none;
+}
+
+    </style>
+</head>
+<body>
+    {% include 'partials/header.html' %}
+
+    <main class="container">
+        
+        <div class="sidebar">
+            {% if categories %}
+            <div class="box categories">
+                <h3 class="title">Categories:</h3>
+                <ul>
+                    <li><a href="/products">All</a></li>
+                    {% for category in categories %}
+                        {% if category.product_count == 0 %}
+                        <li title="Without products">
+                            {% for _ in range(end=category.branches - 1) %}
+                            &nbsp;&nbsp;
+                            {% endfor %}
+                            {{category.name}}
+                        </li>
+                        {% else %}
+                        <li title="{{category.product_count}} products">
+                            <a href="/product-category/{{category.slug}}">
+                                {% for _ in range(end=category.branches - 1) %}
+                                &nbsp;&nbsp;
+                                {% endfor %}
+                                {{category.name}}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="box">
+                <h3 class="title">Price:</h3>
+                <form oninput="result.value='$' + minimum_price.value">
+                    <label for="minimum-price">Minimum</label>
+                    <input type="range" id="minimum-price" name="minimum_price" min="0.00" max="100.00" value="0.00" step="1.00" />
+                    <output name="result" for="minimum-price">$0</output>
+                </form>
+                <form oninput="result.value='$' + maximum_price.value">
+                    <label for="maximum-price">Maximum</label>
+                    <input type="range" id="maximum-price" name="maximum_price" min="0.00" max="100.00" value="50.00" step="1.00" />
+                    <output name="result" for="maximum-price">$50</output>
+                </form>
+            </div>
+
+
+        </div>
+        <div class="content">
+        {% if total_pages > 1 %}
+            {% set previous_page = current_page - 1 %}
+            {% if previous_page == 0 %}
+                {% set previous_page = 1 %}
+            {% endif %}
+            {% set next_page = current_page + 1 %}
+            {% if next_page > total_pages %}
+                {% set next_page = current_page %}
+            {% endif %}
+            <div class="pagination">
+                <span>{{ total_products }} items</span>
+                <a href="{{path}}?page=1">«</a>
+                <a href="{{path}}?page={{ previous_page }}">‹</a>
+                <form id="pagination" method="get" action="{{path}}">
+                    <input type="number" name="page" value="{{ current_page }}" min="1" max="2">
+                </form>
+                <span>of {{ total_pages }}</span>
+                <a href="{{path}}?page={{ next_page }}">›</a>
+                <a href="{{path}}?page={{ total_pages }}">»</a>
+            </div>
+            {% endif %}
+
+            <ul class="product-list">
+                {% for product in products %}
+                <li>
+                    <a href="{{ product.permalink }}">
+                        <img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}">
+                        {% set promotion = (1 - (product.price / product.regular_price)) * 100.0 %}
+                    
+                        <div class="labels">
+                            {% if product.stock_status == "outofstock" %}
+                            <label class="outofstock">Out off stock</label>
+                            {% endif %}
+                            {% if product.on_sale and promotion > 0 %}
+                            <label class="onsale">-{{ promotion | round }}%</label>
+                            {% endif %}
+                        </div>
+                    </a>
+                    <h2>{{ product.name }}</h2>
+                    <p>SKU: {{ product.sku }}</p>
+                    <p>Description: {{ product.short_description }}</p>
+                    <p>
+                        {% if product.on_sale %}
+                            <span class="sales_price">${{ product.regular_price | round_and_format(places=2) }}</span>
+                        {% endif %}
+                        <span class="regular_price">${{ product.price | round_and_format(places=2) }}</span>
+                    </p>
+                    <form action="/cart/add" method="post">
+                        <input type="hidden" name="product_id" value="{{ product.id }}">
+                        <input type="hidden" id="product-quantity" name="product_quantity" value="1">
+                        <button type="submit" {% if product.stock_status == "outofstock" %}disabled{% endif %}>Add To Cart</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </main>
+
+    {% include 'partials/footer.html' %}
+</body>
+</html>

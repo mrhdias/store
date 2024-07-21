@@ -1,0 +1,20 @@
+<style>
+.promotions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px
+}
+.promotions > li {
+    display: flex;
+    flex-direction: column;
+}
+</style>
+<ul class="promotions">
+    {% for product in products %}
+    <li>
+        <a href="/product/{{ product.slug }}"><img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}" /></a>
+        {{ product.name }}
+    </li>
+    {% endfor %}
+</ul>

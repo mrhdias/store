@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="../assets/css/store.css?v=2024071904">
+</head>
+<body>
+
+    {% include 'partials/header.html' %}
+
+    <main style="padding: 20px;">
+    {% if cart | length > 0 %}
+        {% if partial == "cart" %}
+            {% include 'partials/cart.html' %}
+        {% elif partial == "checkout" %}
+            {% include 'partials/checkout.html' %}
+        {% endif %}
+    {% else %}
+        <h2>Your cart is currently empty.</h2>
+        <p>
+            Before proceed to checkout you must add some products to your shopping cart.<br />
+            You will find a lot of interesting products on our "Shop" page.
+        </p>
+    {% endif %}
+    </main>
+
+    {% include 'partials/footer.html' %}
+</body>
+</html>

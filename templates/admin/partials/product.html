@@ -1,0 +1,242 @@
+<style>
+.container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.blocks {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 20px;
+}
+
+.article {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.article .section {
+    background-color: #fefefe;
+    padding: 20px;
+}
+
+textarea {
+    width: 100%;
+    resize: none;
+    padding: 4px;
+    margin-top: 10px;
+}
+
+.categories-selector {
+    padding: 4px;
+    margin: 0 0 10px 0;
+    height: 200px;
+    overflow-y: scroll;
+    border: 1px solid #000;
+}
+
+.categories ul {
+    list-style: none;
+}
+
+.boxes {
+    display: flex;
+    gap: 20px;
+    flex-direction: column;
+}
+
+.boxes .box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background-color: #fefefe;
+    padding: 20px;
+}
+</style>
+{% if alert %}
+<span class="alert">{{ alert }} <a href="{{ product.permalink }}" target="_blank">View Product</a></span>
+{% endif %}
+
+<div class="container">
+
+    <div class="blocks">
+
+        <form id="product" class="article product"
+            method="post"
+            action="/admin/products/{{ product.id }}"
+            enctype="multipart/form-data">
+
+            <div class="section">
+                <label for="product-name">Name:</label>
+                <input id="product-name" type="text" name="name" value="{{ product.name }}"
+                    placeholder="Product name" minlength="4" required>
+                <label for="product-slug">Slug:</label>
+                <input id="product-slug" type="text" name="slug" value="{{ product.slug }}" placeholder="Product slug">
+                Permalink: <a href="{{ product.permalink }}" target="_blank">{{ product.permalink }}</a>
+            </div>
+
+            <details class="section" open>
+                <summary>Product Description</summary>
+                <textarea id="product-description"
+                    name="description" rows="5"
+                    placeholder="Full description of the product"
+                    minlength="4"
+                    required>{{ product.description }}</textarea>
+            </details>
+
+            <details class="section" open>
+                <summary>Product Short Description</summary>
+                <textarea id="product-short-description"
+                    name="short_description" rows="5"
+                    placeholder="Short description of the product"
+                    minlength="4"
+                    required>{{ product.short_description }}</textarea>
+            </details>
+
+            <details class="section categories" open>
+                <summary>Product Categories</summary>
+                <div style="padding: 10px 0;">
+                {% if categories %}
+                <ul class="categories-selector">
+                    {% set_global branches = 1 %}
+                    {% for category in categories %}
+                        {% if category.branches > branches %}
+                            <ul>
+                        {% elif category.branches < branches %}
+                            {% for _ in range(end=branches - category.branches) %}
+                                </ul>
+                            {% endfor %}
+                        {% endif %}
+                        <li>
+                            <input type="checkbox"
+                                name="category_id"
+                                value="{{category.id}}"
+                                title="Check to add category to product" {% if product.categories is containing(category.id) %}checked{% endif %}> {{category.name}}
+                            <input type="radio"
+                                name="primary_category"
+                                value="{{category.id}}"
+                                title="Check to set as main category" {% if product.primary_category == category.id %}checked{% endif %}>
+                        </li>
+                        {% set_global branches = category.branches %}
+                    {% endfor %}
+                    {% for _ in range(end=branches) %}
+                        </ul>
+                    {% endfor %}
+                {% endif %}
+
+                <label for="new-category">New Category:</label>
+                <input id="new-category" type="text" name="new_category" value="">
+                {% if categories %}
+                    <select name="parent_category">
+                        <option value="">- Parent Category -</option>
+                        {% for category in categories %}
+                            <option value="{{category.id}}">
+                            {% for _ in range(end=category.branches - 1) %}
+                                &nbsp;&nbsp;
+                            {% endfor %}
+                            {{category.name}}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% endif %}
+
+
+                <button form="product" type="submit">Add Category</button>
+                </div>
+            </details>
+
+            <details class="section">
+                <summary>Product data</summary>
+                <div style="margin-top: 10px;">
+                    <label for="product-sku">SKU:</label>
+                    <input id="product-sku" type="text" name="sku" value="{{ product.sku }}" placeholder="Product SKU" required>
+                    <label for="product-regular-price">Regular Price:</label>
+                    <input id="product-regular-price" type="number"
+                        placeholder="0.00" step="0.01" min="0"
+                        name="regular_price" value="{{ product.regular_price | round_and_format(places=2) }}"
+                        required>
+                    <label for="product-quantity">Quantity:</label>
+                    <input id="product-quantity" type="number"
+                        placeholder="0" step="1" min="0"
+                        name="stock_quantity" value="{{ product.stock_quantity }}"
+                        required>
+                </div>
+            </details>
+
+            <div class="article images">
+                <div class="section" style="display: flex; flex-direction: column; gap: 20px;">
+                    {% if product.images %}
+                    <div id="handle_media"
+                        style="display: flex; flex-direction: column; align-items: flex-start; gap: 20px;">
+                        <div style="display: flex; flex-direction: row; flex-wrap: wrap; gap: 20px; max-width: calc((200px + 20px)* 4);">
+                            {% for image in product.images %}
+                            <div>
+                                <input type="hidden" name="image_id" value="{{ image.id }}" />
+                                <input type="hidden" name="image_src" value="{{ image.src }}" />
+                                <div>
+                                    <input id="remove-image" type="checkbox" name="image_remove" value="{{ image.id }}" />
+                                    <label for="remove-image">Remove Image</label>
+                                </div>
+                                <img src="{{ image.src }}" alt="{{ image.alt }}"
+                                    style="max-width: 200px; max-height: 200px;" />
+                                <div>
+                                    <label for="image-name">Name:</label>
+                                    <input id="image-name" type="text" name="image_name" value="{{ image.name }}" required />
+                                </div>
+                                <div>
+                                    <label for="image-position">Position:</label>
+                                    <input id="image-position" type="number" name="image_position" value="{{ image.position }}"
+                                        min="0" max="10" step="1" required />
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div>
+                            <input id="delete-media" type="checkbox" name="delete_images" value="yes" />
+                            <label for="delete-media">also delete from media library</label>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div id="media">
+                        <div>
+                            <label for="files">Choose product images to upload:</label>
+                            <input type="file" id="files" name="files" accept=".jpg, .jpeg, .png, .web" multiple>
+                            <button form="product" type="submit">Add Images</button>
+                        </div>
+                    </div>
+                </form>
+                <div><a href="/admin/products/{{ product.id }}/media">Select from media library</a></div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="boxes">
+        <div class="box">
+            <label for="product-status">Status:</label>
+            <select form="product" id="product-status" name="status">
+                {% for name in status %}
+                <option value="{{ name | lower }}" {% if name | lower == product.status %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="box publish-box">
+            <button form="product" type="submit">
+            {% if product.id == 0 %}
+                Save
+            {% else %}
+                Update
+            {% endif %}
+            </button>
+        </div>
+
+    </div>
+
+</div>

@@ -1,0 +1,85 @@
+//
+// Last Modification: 2024-06-23 19:43:25
+//
+
+use crate::types::Status;
+
+use num_traits::ToPrimitive;
+
+use serde::{
+    Serialize,
+    Deserialize
+};
+
+use sqlx::{
+    types::Decimal,
+    FromRow,
+    Row
+};
+
+use serde_json::Value as JsonValue;
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct ProductImage {
+    id: i32,
+    src: String,
+    name: String,
+    alt: String,
+    position: i32,
+}
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct Product {
+    pub id: i32,
+    pub sku: String,
+    pub name: String,
+    pub slug: String,
+    pub description: String,
+    pub regular_price: f32,
+    pub stock_quantity: i32,
+    pub permalink: String,
+    pub status: Status,
+    pub images: Vec<ProductImage>
+}
+
+pub async fn get_product_to_edit(
+    id: i32,
+    pool: sqlx::Pool<sqlx::Postgres>) -> Result<Product, sqlx::Error> {
+
+    let row = sqlx::query(r#"
+        SELECT
+            products.id, products.sku, products.name, products.slug, products.description,
+            products.price, products.regular_price, products.sale_price, products.on_sale,
+            products.stock_quantity, products.stock_status, products.permalink,
+            products.date_created, products.status,
+            COALESCE( (SELECT (JSON_AGG(ti)::jsonb)
+            FROM (
+                SELECT media.id, media.src, media.name, media.alt, product_media.position
+                FROM media, product_media
+                WHERE media.id = product_media.media_id AND product_media.product_id = products.id
+                ORDER BY product_media.position
+            ) ti), '[]') AS images
+        FROM products WHERE products.id = $1;
+    "#)
+        .bind(id)
+        .fetch_one(&pool)
+        .await?;
+
+    let images_json: JsonValue = row.get("images");
+
+    Ok(Product {
+        id: row.get::<i32, _>("id"),
+        sku: row.get::<String, _>("sku"),
+        name: row.get::<String, _>("name"),
+        slug: row.get::<String, _>("slug"),
+        description: row.get::<String, _>("description"),
+        regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
+            Some(f) => f,
+            None => 0.00,
+        },
+        stock_quantity: row.get::<i32, _>("stock_quantity"),
+        status: row.get::<Status, _>("status"),
+        permalink: row.get::<String, _>("permalink"),
+        images: serde_json::from_value(images_json).unwrap(),
+    })
+}

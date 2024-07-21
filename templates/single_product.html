@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.name }}</title>
+    <link rel="stylesheet" href="/assets/css/store.css?v=20240671901">
+</head>
+<body>
+
+    {% include 'partials/header.html' %}
+
+    <main class="single-product">
+
+        <div class="product-carousel">
+            <figure>
+                <img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}" style="max-width: 50%;">
+            </figure>
+        </div>
+        <div class="product-details">
+            <h1>{{ product.name }}</h1>
+            <p>
+                {% if product.on_sale %}
+                    <span class="sales_price">${{ product.regular_price | round_and_format(places=2) }}</span>
+                {% endif %}
+                <span class="regular_price">${{ product.price | round_and_format(places=2) }}</span>
+            </p>
+            <form action="/cart/add" method="post">
+                <input type="hidden" name="product_id" value="{{ product.id }}">
+                <input type="number" id="product-quantity" name="product_quantity" value="1" step="1" min="1">
+                <button type="submit" {% if product.stock_status == "outofstock" %}disabled{% endif %}>Add To Cart</button>
+            </form>
+        </div>
+        <div class="product-info">
+            <div>
+                <h2>Description</h2>
+                <p>{{ product.description }}</p>
+            </div>
+        </div>
+    </main>
+
+    {% include 'partials/footer.html' %}
+</body>
+</html>
