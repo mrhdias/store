@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-06-25 22:35:37
+// Last Modification: 2024-07-21 23:06:29
 //
 
 // https://woocommerce.com/document/woocommerce-shortcodes/products/
@@ -22,7 +22,6 @@ use serde::{
 };
 
 use crate::types;
-use crate::products;
 use crate::models::products::Products;
 
 

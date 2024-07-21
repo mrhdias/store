@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-06-23 20:46:09
+// Last Modification: 2024-07-21 23:08:51
 //
 
 pub mod media;
@@ -9,10 +9,8 @@ pub mod users;
 
 use crate::auth;
 
-use std::collections::HashMap;
-
 use axum::{
-    extract::{Extension, FromRequest, FromRequestParts, Query},
+    extract::Extension,
     response::Html,
 };
 
@@ -41,46 +39,5 @@ pub async fn dashboard(
     let mut data = Context::new();
     data.insert("partial", "dashboard");
     let rendered = tera.render("admin/admin.html", &data).unwrap();
-    Html(rendered)
-}
-
-pub async fn admin(
-    auth::RequireAuth { role }: auth::RequireAuth,
-    Query(parameters): Query<HashMap<String, String>>,
-    Extension(tera): Extension<Tera>) -> Html<String> {
-
-    println!("Admin Role: {:?}", role);
-
-    let mut data = Context::new();
-
-    if role.is_admin() {
-        data.insert("partial", "dashboard");
-        let rendered = tera.render("admin/admin.html", &data).unwrap();
-        return Html(rendered)
-    }
-
-    if parameters.contains_key("action") {
-        match parameters.get("action").unwrap().as_str() {
-            "login" => {
-                // Handle login action
-                // check the login and password fields
-                println!("Login");
-            },
-            "logout" => {
-                // Handle logout action
-                println!("Logout");
-            },
-            _ => {
-                // Handle unknown action
-                // if authenticated user go to dashboard
-                // else show login page
-                println!("Unknown action");
-            }
-        }
-    }
-
-    println!("Admin Parameters: {:?}", parameters);
-
-    let rendered = tera.render("login.html", &data).unwrap();
     Html(rendered)
 }

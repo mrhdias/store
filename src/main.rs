@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-18 19:31:24
+// Last Modified: 2024-07-21 23:05:21
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -142,8 +142,7 @@ async fn login(
 }
 
 async fn home(
-    Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let data = Context::new();
     let rendered = tera.render("home.html", &data).unwrap();
@@ -259,7 +258,6 @@ async fn main() {
 
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);
 
-    // run our app with hyper, listening globally on port 8080
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
         .await.unwrap();
