@@ -16,10 +16,10 @@ use serde::{
     Deserialize
 };
 
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(type_name = "user_roles", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
-enum UserRoles {
+pub enum UserRoles {
     Admin,
     Customer,
     Guest,
@@ -33,6 +33,16 @@ impl UserRoles {
             UserRoles::Guest => "guest",
         }
     }
+
+    pub fn is_admin(&self) -> bool {
+        self == &UserRoles::Admin
+    }
+}
+
+pub struct Cardentials {
+    pub user_id: i32,
+    pub password: String,
+    pub role: UserRoles,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -51,7 +61,6 @@ pub struct User {
 
 pub struct Users {
     pool: sqlx::Pool<sqlx::Postgres>,
-    pub total_count: i32,
 }
 
 impl Users {
@@ -62,6 +71,27 @@ impl Users {
 
     fn delete(&self) {
         // Implementation to delete a user by ID
+    }
+
+    pub async fn cardentials(&self, user: &str) -> Result<Cardentials, anyhow::Error> {
+        // Implementation to get users by username and password
+
+        let row = sqlx::query(r#"
+            SELECT id, password, role FROM users WHERE email = $1;
+        "#)
+            .bind(user)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if let Some(row) = row {
+            Ok(Cardentials {
+                user_id: row.get::<i32, _>("id"),
+                password: row.get::<String, _>("password"),
+                role: row.get::<UserRoles, _>("role"),
+            })
+        } else {
+            Err(anyhow::Error::msg("User not found"))
+        }
     }
 
     pub async fn get_all(&self,
@@ -107,15 +137,17 @@ impl Users {
         // Implementation to add a new user
     }
 
-    pub async fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
+    pub async fn count(&self) -> Result<i32, anyhow::Error> {
         let total_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users")
-            .fetch_one(&pool)
-            .await
-            .expect("Failed to count users");
+            .fetch_one(&self.pool)
+            .await?;
 
+        Ok(total_count.0 as i32)
+    }
+
+    pub fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
         Users {
             pool,
-            total_count: total_count.0 as i32,
         }
     }
 }

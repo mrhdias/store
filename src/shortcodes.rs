@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-21 23:06:29
+// Last Modification: 2024-07-22 18:39:38
 //
 
 // https://woocommerce.com/document/woocommerce-shortcodes/products/
@@ -22,7 +22,7 @@ use serde::{
 };
 
 use crate::types;
-use crate::models::products::Products;
+use crate::models::products;
 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,8 +98,10 @@ pub async fn products(
         None => "name".to_string(),
     };
 
-    let products_manager = Products::new(pool).await;
-    let products = products_manager.get_by_parameters(&ids, &skus, 1, per_page, order)
+    let products_manager = products::Products::new(pool).await;
+    let products = products_manager
+        .frontend()
+        .get_by_parameters(&ids, &skus, 1, per_page, order)
         .await.expect("unable to get the products");
 
 

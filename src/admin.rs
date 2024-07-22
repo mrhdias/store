@@ -1,10 +1,9 @@
 //
-// Last Modification: 2024-07-21 23:08:51
+// Last Modification: 2024-07-22 19:06:14
 //
 
 pub mod media;
 pub mod products;
-pub mod categories;
 pub mod users;
 
 use crate::auth;

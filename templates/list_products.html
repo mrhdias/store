@@ -158,7 +158,7 @@
                     </a>
                     <h2>{{ product.name }}</h2>
                     <p>SKU: {{ product.sku }}</p>
-                    <p>Description: {{ product.short_description }}</p>
+                    <p>{{ product.short_description }}</p>
                     <p>
                         {% if product.on_sale %}
                             <span class="sales_price">${{ product.regular_price | round_and_format(places=2) }}</span>

@@ -27,29 +27,6 @@ impl StockStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq)]
-#[sqlx(type_name = "user_roles", rename_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum UserRoles {
-    Admin,
-    Customer,
-    Anonymous,
-}
-
-impl UserRoles {
-    fn as_str(&self) -> &str {
-        match self {
-            UserRoles::Admin => "admin",
-            UserRoles::Customer => "customer",
-            UserRoles::Anonymous => "anonymous",
-        }
-    }
-
-    pub fn is_admin(&self) -> bool {
-        self == &UserRoles::Admin
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Order {
     Asc,

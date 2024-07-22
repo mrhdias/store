@@ -2,7 +2,7 @@
 // Last Modified: 2024-07-18 19:30:51
 //
 
-use crate::cart;
+use crate::models::cart;
 use crate::utils;
 use crate::notifications;
 use std::collections::HashMap;

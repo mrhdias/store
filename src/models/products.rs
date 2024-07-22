@@ -1,11 +1,19 @@
 //
-// Model Products
+// Last Modifications: 2024-07-22 22:30:33
 //
 
 use crate::types;
 
 use anyhow;
 use num_traits::ToPrimitive;
+use std::collections::HashMap;
+use url::Url;
+use chrono::NaiveDateTime;
+
+use std::{
+    fs,
+    path::PathBuf,
+};
 
 use strum::EnumIter;
 
@@ -13,13 +21,14 @@ use sqlx::{
     postgres::PgRow,
     types::{Json, Decimal},
     FromRow,
-    Row
+    Row,
 };
 
 use serde::{
     Serialize,
     Deserialize
 };
+use serde_json::Value as JsonValue;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, EnumIter)]
 #[sqlx(type_name = "status", rename_all = "lowercase")]
@@ -32,7 +41,7 @@ pub enum Status {
 }
 
 impl Status{
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             Status::Draft => "draft",
             Status::Pending => "pending",
@@ -45,7 +54,7 @@ impl Status{
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "stock_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
-enum StockStatus {
+pub enum StockStatus {
     InStock,
     OutOfStock,
     OnBackorder
@@ -113,7 +122,7 @@ pub struct Category {
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct ProductRow {
+pub struct ProductRowFrontend {
     id: i32,
     sku: String,
     name: String,
@@ -132,7 +141,7 @@ pub struct ProductRow {
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct Product {
+pub struct ProductFrontend {
     id: i32,
     sku: String,
     name: String,
@@ -145,7 +154,7 @@ pub struct Product {
     sale_price: f32,
     on_sale: bool,
     stock_quantity: i32,
-    stock_status: types::StockStatus,
+    stock_status: StockStatus,
     weight: i32,
     // categories: Vec<Category>,
     gallery: Json<Vec<Media>>,
@@ -157,6 +166,31 @@ pub struct Products {
 
 impl Products {
 
+    pub fn backend(&self) -> Backend {
+        Backend::new(&self.pool)
+    }
+
+    pub fn frontend(&self) -> Frontend {
+        Frontend::new(&self.pool)
+    }
+
+    pub async fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
+        Products {
+            pool,
+        }
+    }
+}
+
+//
+// Frontend implementation
+//
+
+pub struct Frontend<'a> {
+    pool: &'a sqlx::Pool<sqlx::Postgres>,
+}
+
+impl<'a> Frontend<'a> {
+
     pub async fn count_all_category_by_slug(&self, slug: &str)  -> Result<i32, anyhow::Error> {
         let total_count: (i64, ) = sqlx::query_as(&format!(r#"
             SELECT COUNT(*)
@@ -167,7 +201,7 @@ impl Products {
                 categories.id = product_categories.category_id AND
                 categories.slug = '{}';
         "#, slug))
-            .fetch_one(&self.pool)
+            .fetch_one(self.pool)
             .await?;
 
         Ok(total_count.0 as i32)
@@ -177,7 +211,7 @@ impl Products {
         slug: &str,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRow>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
 
@@ -203,7 +237,7 @@ impl Products {
             .bind(slug)
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRow {
+            .map(|row: PgRow| ProductRowFrontend {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -229,7 +263,7 @@ impl Products {
                 weight: row.get::<i32, _>("weight"),
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
-            .fetch_all(&self.pool)
+            .fetch_all(self.pool)
             .await?;
 
         Ok(products)
@@ -254,7 +288,7 @@ impl Products {
             )
             SELECT id, name, slug, parent, path, has_childs, branches, product_count FROM category_with_products ORDER BY path;
         "#)
-            .fetch_all(&self.pool)
+            .fetch_all(self.pool)
             .await?;
 
         Ok(categories)
@@ -265,7 +299,7 @@ impl Products {
         skus: &Vec<String>,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRow>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
 
         let mut where_parts = Vec::new();
         where_parts.push("products.status = 'publish'".to_string());
@@ -300,7 +334,7 @@ impl Products {
         "#, where_parts.join(" AND "), order.as_str()))
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRow {
+            .map(|row: PgRow| ProductRowFrontend {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -326,13 +360,13 @@ impl Products {
                 weight: row.get::<i32, _>("weight"),
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
-            .fetch_all(&self.pool)
+            .fetch_all(self.pool)
             .await?;
 
         Ok(products)
     }
 
-    pub async fn get_one_by_slug(&self, slug: &str) -> Result<Product, anyhow::Error> {
+    pub async fn get_one_by_slug(&self, slug: &str) -> Result<ProductFrontend, anyhow::Error> {
 
         let product = sqlx::query(r#"
             SELECT
@@ -348,7 +382,7 @@ impl Products {
             WHERE products.slug = $1 AND products.status = 'publish';
         "#)
             .bind(slug)
-            .map(|row: PgRow| Product {
+            .map(|row: PgRow| ProductFrontend {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -370,34 +404,21 @@ impl Products {
                 },
                 on_sale: row.get::<bool, _>("on_sale"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
-                stock_status: row.get::<types::StockStatus, _>("stock_status"),
+                stock_status: row.get::<StockStatus, _>("stock_status"),
                 weight: row.get::<i32, _>("weight"),
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
-            .fetch_one(&self.pool)
+            .fetch_one(self.pool)
             .await?;
 
         Ok(product)
-    }
-
-    pub async fn count_all(&mut self, status: Option<Status>) -> Result<i32, anyhow::Error> {
-        let from = match status {
-            Some(status) => format!("products WHERE status = '{}'", status.as_str()),
-            None => "products".to_string(),
-        };
-
-        let total_count: (i64, ) = sqlx::query_as(&format!("SELECT COUNT(*) FROM {};", from))
-            .fetch_one(&self.pool)
-            .await?;
-
-        Ok(total_count.0 as i32)
     }
 
     pub async fn get_all(&self,
         status: Option<Status>,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRow>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
 
@@ -426,7 +447,7 @@ impl Products {
         "#, from, order.as_str()))
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRow {
+            .map(|row: PgRow| ProductRowFrontend {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -452,32 +473,465 @@ impl Products {
                 weight: row.get::<i32, _>("weight"),
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
-            .fetch_all(&self.pool)
+            .fetch_all(self.pool)
             .await?;
 
         Ok(products)
     }
 
-    async fn delete(&self, product_id: i32) -> Result<(), anyhow::Error> {
-        // Implementation to delete a product
+    pub async fn count_all(&mut self, status: Option<Status>) -> Result<i32, anyhow::Error> {
+        let from = match status {
+            Some(status) => format!("products WHERE status = '{}'", status.as_str()),
+            None => "products".to_string(),
+        };
+
+        let total_count: (i64, ) = sqlx::query_as(&format!("SELECT COUNT(*) FROM {};", from))
+            .fetch_one(self.pool)
+            .await?;
+
+        Ok(total_count.0 as i32)
+    }
+
+    pub fn new(pool: &'a sqlx::Pool<sqlx::Postgres>) -> Self {
+        Frontend {
+            pool,
+        }
+    }
+}
+
+//
+// Backend implementation
+//
+
+#[derive(Debug, PartialEq)]
+pub enum ImageOperation {
+    Delete,
+    Update,
+    Insert,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductImage {
+    pub id: i32,
+    pub src: String,
+    pub name: String,
+    pub alt: String,
+    pub position: i32,
+}
+
+impl ProductImage {
+    pub fn clone(&self) -> ProductImage {
+        ProductImage {
+            id: self.id,
+            src: self.src.to_string(),
+            name: self.name.to_string(),
+            alt: self.alt.to_string(),
+            position: self.position,
+        }
+    }
+
+    pub fn default(& mut self) {
+        self.id = 0;
+        self.src = "".to_string();
+        self.name = "".to_string();
+        self.alt = "".to_string();
+        self.position = 0;
+    }
+
+    pub fn new() -> Self {
+        ProductImage {
+            id: 0,
+            src: "".to_string(),
+            name: "".to_string(),
+            alt: "".to_string(),
+            position: 0
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductRowBackend {
+    id: i32,
+    sku: String,
+    name: String,
+    regular_price: f32,
+    stock_status: StockStatus,
+    stock_quantity: i32,
+    image_src: String,
+    image_alt: String,
+    date_created: String,
+    status: Status,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductBackend {
+    pub id: i32,
+    pub sku: String,
+    pub name: String,
+    pub slug: String,
+    pub permalink: String,
+    pub description: String,
+    pub short_description: String,
+    pub price: f32,
+    pub sale_price: f32,
+    pub regular_price: f32,
+    pub on_sale: bool,
+    pub stock_status: StockStatus,
+    pub stock_quantity: i32,
+    pub status: Status,
+    pub primary_category: i32,
+    pub categories: Vec<i32>,
+    pub images: Vec<ProductImage>
+}
+
+pub struct Backend<'a> {
+    pool: &'a sqlx::Pool<sqlx::Postgres>,
+}
+
+impl<'a> Backend<'a> {
+
+    pub async fn add_to_media(&self,
+        filepath: &str,
+        name: &str,
+        alt: &str) -> Result<i32, anyhow::Error> {
+        // Implementation to add a item to the media list
+
+        let media_row: (i32, ) = sqlx::query_as(r#"
+            INSERT INTO media (src, name, alt)
+            VALUES ($1, $2, $3) RETURNING id;
+        "#)
+            .bind(format!("{}/{}", "http://127.0.0.1:8080", filepath))
+            .bind(name)
+            .bind(alt)
+            .fetch_one(self.pool)
+            .await?;
+
+        Ok(media_row.0)
+    }
+
+    pub async fn delete_categories(&self, product_id: i32) -> Result<(), anyhow::Error> {
+        sqlx::query(r#"
+            DELETE FROM product_categories WHERE product_id = $1;
+        "#)
+            .bind(&product_id)
+            .execute(self.pool)
+            .await?;
 
         Ok(())
     }
 
-    pub async fn update(&self, product_id: i32) -> Result<(), anyhow::Error> {
+    pub async fn add_category(&self,
+        category_id: &i32,
+        product_id: &i32) -> Result<(), anyhow::Error> {
+        // Implementation to add a category to a product
+
+        println!("adding category {} to product {}", category_id, product_id);
+
+        sqlx::query(r#"
+            INSERT INTO product_categories (product_id, category_id)
+            VALUES ($1, $2);
+        "#)
+           .bind(product_id)
+           .bind(category_id)
+           .execute(self.pool)
+           .await?;
+
+        Ok(())
+    }
+
+    pub async fn update(&self,
+        product: &ProductBackend,
+        images: &HashMap<i32, ImageOperation>,
+        delete_media: bool) -> Result<(), anyhow::Error> {
         // Implementation to update a product
+    
+        sqlx::query(r#"
+            UPDATE products
+            SET name = $1, slug = $2, description = $3, short_description = $4,
+                sku = $5, price = $6, regular_price = $6,
+                stock_quantity = $7, stock_status= $8, permalink = $9, status = $10, primary_category = $11
+            WHERE id = $12;
+        "#)
+            .bind(&product.name)
+            .bind(&product.slug)
+            .bind(&product.description)
+            .bind(&product.short_description)
+            .bind(&product.sku)
+            .bind(&product.regular_price)
+            .bind(&product.stock_quantity)
+            .bind(&product.stock_status)
+            .bind(&product.permalink)
+            .bind(&product.status)
+            .bind(&product.primary_category)
+            .bind(&product.id)
+            .execute(self.pool)
+            .await?;
+
+
+        for image in &product.images {
+            println!("IMAGE {:?}", image);
+            if !images.contains_key(&image.id) {
+                continue;
+            }
+
+            let operation = match images.get(&image.id) {
+                Some(operation) => operation,
+                None => continue,
+            };
+
+            println!("IMAGE OPERATION {:?}", operation);
+
+            if *operation == ImageOperation::Insert {
+                // insert image in product_media
+                sqlx::query(r#"
+                    INSERT INTO product_media (product_id, media_id, position)
+                    VALUES ($1, $2, $3);
+                "#)
+                    .bind(&product.id)
+                    .bind(&image.id)
+                    .bind(&image.position)
+                    .execute(self.pool)
+                    .await?;
+
+                // images.remove(&image.id);
+
+                continue;
+            }
+
+            if *operation == ImageOperation::Update {
+                // update image from product_media
+                sqlx::query(r#"
+                    UPDATE product_media
+                    SET position = $1
+                    WHERE product_id = $2 AND media_id = $3;
+                "#)
+                    .bind(&image.position)
+                    .bind(&product.id)
+                    .bind(&image.id)
+                    .execute(self.pool)
+                    .await?;
+
+                // update media name and alt in table media
+                sqlx::query(r#"
+                    UPDATE media
+                    SET name = $1, alt = $2
+                    WHERE id = $3;
+                "#)
+                    .bind(&image.name)
+                    .bind(&image.alt)
+                    .bind(&image.id)
+                    .execute(self.pool)
+                    .await?;
+            }
+        }
+        
+        for (image_id, operation) in images {
+            if *operation != ImageOperation::Delete {
+                continue;
+            }
+            println!("Deleting image {}", image_id);
+
+            sqlx::query(r#"
+                DELETE FROM product_media
+                WHERE media_id = $1;
+            "#)
+                .bind(&image_id)
+                .execute(self.pool)
+                .await?;
+
+            if delete_media {
+                let image_src: String = sqlx::query(r#"
+                    DELETE FROM media
+                    WHERE id = $1
+                    RETURNING src;
+                "#)
+                    .bind(&image_id)
+                    .fetch_one(self.pool)
+                    .await?
+                    .get(0);
+
+
+                // http://127.0.0.1:8080/uploads/2024-06-18/file.png
+                // let image_src = image_row.get::<String, _>("src");
+                let parsed_url = match Url::parse(&image_src) {
+                    Ok(url) => url,
+                    Err(_) => {
+                        return Err(anyhow::anyhow!("Invalid URL: {}", image_src));
+                    }
+                };
+
+                let path = parsed_url.path();
+                let file_path = PathBuf::from(format!("static/{}", path));
+            
+                if file_path.exists() {
+                    fs::remove_file(file_path).expect("Failed to remove file");
+                }
+            }
+        }
 
         Ok(())
     }
 
-    async fn add(&self, product: &Product) -> Result<i32, anyhow::Error> {
+    pub async fn get_all(&self,
+        page: i32,
+        per_page: i32,
+        order: types::Order) -> Result<Vec<ProductRowBackend>, anyhow::Error> {
+        // Implementation to get products
+
+        let offset = (page - 1) * per_page;
+
+        let products = sqlx::query(&format!(r#"
+            SELECT
+                products.id, products.sku, products.name, products.price,
+                products.regular_price, products.sale_price, products.on_sale,
+                products.stock_quantity, products.stock_status, products.date_created,
+                products.status, products.primary_category,
+                COALESCE(image.src, '/assets/images/product.jpg') AS image_src, 
+                COALESCE(image.name, 'Unnamed product') AS image_name, 
+                COALESCE(image.alt, 'Unnamed product') AS image_alt
+            FROM products
+            LEFT JOIN LATERAL (
+                SELECT
+                    media.src, media.name, media.alt
+                FROM product_media
+                JOIN media
+                ON product_media.media_id = media.id WHERE product_media.product_id = products.id
+                ORDER BY product_media.position LIMIT 1
+            ) AS image ON true 
+            ORDER BY 
+                products.date_created {}
+            LIMIT $1 OFFSET $2;
+        "#, order.as_str()))
+            .bind(per_page)
+            .bind(offset)
+            .map(|row: PgRow| ProductRowBackend {
+                id: row.get::<i32, _>("id"),
+                sku: row.get::<String, _>("sku"),
+                name: row.get::<String, _>("name"),
+                regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
+                    Some(f) => f,
+                    None => 0.00,
+                },
+                stock_status: row.get::<StockStatus, _>("stock_status"),
+                stock_quantity: row.get::<i32, _>("stock_quantity"),
+                image_src: row.get::<String, _>("image_src"),
+                image_alt: row.get::<String, _>("image_alt"),
+                date_created: || -> String {
+                    let date_created = row.get::<NaiveDateTime, _>("date_created");
+                    date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
+                }(),
+                status: row.get::<Status, _>("status"),
+            })
+            .fetch_all(self.pool)
+            .await?;
+
+        Ok(products)
+    }
+
+    pub async fn get(&self, product_id: i32) -> Result<ProductBackend, anyhow::Error> {
+        // Implementation to get a product by ID
+
+        let row = sqlx::query(r#"
+            SELECT
+                products.id, products.sku, products.name, products.slug,
+                products.description, products.short_description,
+                products.price, products.regular_price, products.sale_price, products.on_sale,
+                products.stock_quantity, products.stock_status, products.permalink,
+                products.date_created, products.status, products.primary_category,
+                COALESCE( (SELECT (JSON_AGG(ti)::jsonb)
+                FROM (
+                    SELECT media.id, media.src, media.name, media.alt, product_media.position
+                    FROM media, product_media
+                    WHERE media.id = product_media.media_id AND product_media.product_id = products.id
+                    ORDER BY product_media.position
+                ) ti), '[]') AS images,
+                COALESCE( (SELECT to_jsonb(ARRAY_AGG(category_id))
+                FROM product_categories WHERE product_categories.product_id = products.id), '[]') AS categories
+            FROM products WHERE products.id = $1;
+        "#)
+            .bind(&product_id)
+            .fetch_one(self.pool)
+            .await?;
+
+        let images_json: JsonValue = row.get("images");
+        let categories_json: JsonValue = row.get("categories");
+
+        Ok(ProductBackend {
+            id: row.get::<i32, _>("id"),
+            sku: row.get::<String, _>("sku"),
+            name: row.get::<String, _>("name"),
+            slug: row.get::<String, _>("slug"),
+            description: row.get::<String, _>("description"),
+            short_description: row.get::<String, _>("short_description"),
+            regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
+                Some(f) => f,
+                None => 0.00,
+            },
+            price: match row.get::<Decimal, _>("price").to_f32() {
+                Some(f) => f,
+                None => 0.00,
+            },
+            sale_price: match row.get::<Decimal, _>("sale_price").to_f32() {
+                Some(f) => f,
+                None => 0.00,
+            },
+            on_sale: row.get::<bool, _>("on_sale"),
+            stock_status: row.get::<StockStatus, _>("stock_status"),
+            stock_quantity: row.get::<i32, _>("stock_quantity"),
+            status: row.get::<Status, _>("status"),
+            permalink: row.get::<String, _>("permalink"),
+            primary_category: row.get::<i32, _>("primary_category"),
+            images: serde_json::from_value(images_json).unwrap(),
+            categories: serde_json::from_value(categories_json).unwrap(),
+        })
+    }
+
+    pub async fn add(&self, product: &ProductBackend) -> Result<i32, anyhow::Error> {
         // Implementation to add a new product
 
-        Ok(0)
+        let product_id: i32 = sqlx::query(r#"
+            INSERT INTO products (
+                name, slug, description, sku, price, regular_price, stock_quantity, stock_status, permalink, status)
+            VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id;
+        "#)
+           .bind(&product.name)
+           .bind(&product.slug)
+           .bind(&product.description)
+           .bind(&product.sku)
+           .bind(&product.regular_price)
+           .bind(&product.stock_quantity)
+           .bind(&product.stock_status)
+           .bind(&product.permalink)
+           .bind(&product.status)
+           .fetch_one(self.pool)
+           .await?
+           .get(0);
+
+        for image in &product.images {
+            sqlx::query(r#"
+                INSERT INTO product_media (product_id, media_id, position)
+                VALUES ($1, $2, $3);
+            "#)
+               .bind(&product_id)
+               .bind(&image.id)
+               .bind(&image.position)
+               .execute(self.pool)
+               .await?;
+        }
+
+        Ok(product_id)
     }
 
-    pub async fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
-        Products {
+    pub async fn count_all(&self) -> Result<i32, anyhow::Error> {
+        let total_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM products")
+            .fetch_one(self.pool)
+            .await?;
+
+        Ok(total_count.0 as i32)
+    }
+
+    pub fn new(pool: &'a sqlx::Pool<sqlx::Postgres>) -> Self {
+        Backend {
             pool,
         }
     }

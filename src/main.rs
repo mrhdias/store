@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-21 23:05:21
+// Last Modified: 2024-07-22 18:41:41
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -26,13 +26,11 @@ mod shortcodes;
 mod auth;
 mod notifications;
 
-use chrono::{Utc, Duration};
-
-use uuid::Uuid;
+use chrono::Duration;
 use std::collections::HashMap;
 
 use axum::{
-    extract::{Extension, Form, Request, Query},
+    extract::{Extension, Form, Query, Request},
     http::{header::LOCATION, HeaderMap, HeaderValue, StatusCode},
     middleware::from_extractor,
     response::Html,
@@ -40,6 +38,7 @@ use axum::{
     Router,
     ServiceExt,
 };
+
 
 use tower::Layer;
 use tower_http::{
@@ -49,10 +48,7 @@ use tower_http::{
 
 use tera::{Tera, Context};
 
-use sqlx::{
-    postgres::PgPoolOptions,
-    Row
-};
+use sqlx::postgres::PgPoolOptions;
 
 use axum_session::{SessionConfig, SessionLayer};
 use axum_session_sqlx::SessionPgSessionStore;
@@ -74,51 +70,42 @@ async fn autentication(
     Extension(tera): Extension<Tera>,
     Form(payload): Form<LoginForm>) -> (StatusCode, HeaderMap, Html<String>) {
 
-    let row = sqlx::query(r#"SELECT id, password, role FROM users WHERE email = $1"#)
-        .bind(payload.user)
-        .fetch_optional(&pool)
-        .await
-        .expect("Failed to fetch user");
+    let user = models::users::Users::new(pool.clone());
 
     let mut data = Context::new();
 
-    if let Some(row) = row {
-        let user_id = row.get::<i32, _>("id");
-        let password = row.get::<String, _>("password");
-        let role = row.get::<types::UserRoles, _>("role");
-        if payload.password == password {
-            // Create session here
-            let token = Uuid::new_v4().to_string();
+    match user.cardentials(&payload.user).await {
+        Ok(user) => {
+            if payload.password == user.password {
+                // Create session here
+                let tokens_manager = models::tokens::Tokens::new(pool.clone());
+                let token = match tokens_manager.add(&user.user_id).await {
+                    Ok(token) => token,
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        return (StatusCode::INTERNAL_SERVER_ERROR, HeaderMap::new(), "Failed to generate token.".to_string().into());
+                    }
+                };
+                println!("TOKEN: {}", token);
+                let mut headers = HeaderMap::new();
+                headers.insert(axum::http::header::SET_COOKIE, format!("token={}; Path=/; HttpOnly", token).parse().unwrap());
 
-            println!("TOKEN: {}", token);
-            let mut headers = HeaderMap::new();
-            headers.insert(axum::http::header::SET_COOKIE, format!("token={}; Path=/; HttpOnly", token).parse().unwrap());
-
-            let expires_time = Utc::now().naive_utc() + Duration::hours(24);
-
-            sqlx::query(r#"
-                INSERT INTO tokens (token, user_id, expires) VALUES ($1, $2, $3)
-                ON CONFLICT (user_id)
-                DO UPDATE SET token = EXCLUDED.token, expires = EXCLUDED.expires;
-            "#)
-                .bind(&token)
-                .bind(&user_id)
-                .bind(&expires_time)
-                .execute(&pool)
-                .await
-                .expect("error inserting tokens");
-
-            if role.is_admin() {
-                // data.insert("partial", "dashboard");
-                // let rendered = tera.render("admin/admin.html", &data).unwrap();
-                // return (StatusCode::OK, headers, Html(rendered));
-                headers.insert(LOCATION, HeaderValue::from_str("/admin").unwrap());
-                return (StatusCode::FOUND, headers, Html("".to_string()));
-            } else {
-                return (StatusCode::OK, headers, Html("<h1>User Login Successful</h1>".to_string()));
+                if user.role.is_admin() {
+                    // data.insert("partial", "dashboard");
+                    // let rendered = tera.render("admin/admin.html", &data).unwrap();
+                    // return (StatusCode::OK, headers, Html(rendered));
+                    headers.insert(LOCATION, HeaderValue::from_str("/admin").unwrap());
+                    return (StatusCode::FOUND, headers, Html("".to_string()));
+                } else {
+                    return (StatusCode::OK, headers, Html("<h1>User Login Successful</h1>".to_string()));
+                }
             }
         }
-    }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return (StatusCode::NOT_FOUND, HeaderMap::new(), "User not found!".to_string().into());
+        }
+    };
 
     data.insert("alert", "Invalid username or password");
 
@@ -254,6 +241,7 @@ async fn main() {
         // .nest_service("/assets", ServeDir::new("static/assets"))
         // .nest_service("/uploads", ServeDir::new("static/uploads"))
         .fallback_service(ServeDir::new("static"));
+
 
 
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);

@@ -1,5 +1,5 @@
 //
-// Product Controller
+// Last Modification: 2024-07-22 19:11:15
 //
 
 use crate::types;
@@ -23,7 +23,7 @@ pub async fn product(
 
     let products_manager = products::Products::new(pool).await;
 
-    match products_manager.get_one_by_slug(&slug).await {
+    match products_manager.frontend().get_one_by_slug(&slug).await {
         Ok(product) => {
             println!("select product with PgRow:\n{:?}", product);
 
@@ -52,7 +52,11 @@ pub async fn product_category(
 
         let per_page = pagination.per_page.unwrap_or(3);
         
-        let total = products_manager.count_all_category_by_slug(&slug).await.unwrap_or(0);
+        let total = products_manager
+            .frontend()
+            .count_all_category_by_slug(&slug)
+            .await
+            .unwrap_or(0);
 
         if total == 0 {
             return Html(format!("There are no products available for \"{}\" category", slug));
@@ -67,14 +71,14 @@ pub async fn product_category(
             page = 1;
         }
 
-        match products_manager.get_category_by_slug(
+        match products_manager.frontend().get_category_by_slug(
             &slug,
             page, 
             per_page as i32,
             pagination.order.unwrap_or(types::Order::Desc)).await {
             Ok(products) => {
     
-                let categories = match products_manager.categories().await {
+                let categories = match products_manager.frontend().categories().await {
                     Ok(c) => c,
                     Err(e) => {
                         eprintln!("Error: {}", e);
@@ -108,11 +112,11 @@ pub async fn list(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>)  -> Html<String> {
 
-    let mut products_manager = products::Products::new(pool.clone()).await;
+    let products_manager = products::Products::new(pool.clone()).await;
 
     let per_page = pagination.per_page.unwrap_or(3);
     
-    let total = match products_manager.count_all(Some(products::Status::Publish)).await {
+    let total = match products_manager.frontend().count_all(Some(products::Status::Publish)).await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -133,14 +137,14 @@ pub async fn list(
         page = 1;
     }
 
-    match products_manager.get_all(
+    match products_manager.frontend().get_all(
         Some(products::Status::Publish),
         page, 
         per_page as i32,
         pagination.order.unwrap_or(types::Order::Desc)).await {
         Ok(products) => {
 
-            let categories = match products_manager.categories().await {
+            let categories = match products_manager.frontend().categories().await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("Error: {}", e);

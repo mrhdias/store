@@ -1,11 +1,15 @@
 //
-// Models
+// Last Modification: 2024-07-22 19:00:37
 // References:
 // https://developer.mozilla.org/en-US/docs/Glossary/MVC
 //
 
 pub mod users;
+pub mod tokens;
+pub mod categories;
 pub mod products;
+pub mod cart;
+pub mod orders;
 
 // pub trait Manager {
 //     fn do_thingy(&self);

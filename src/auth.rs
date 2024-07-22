@@ -1,63 +1,20 @@
 //
-// Last Modification: 2024-06-29 20:32:35
+// Last Modification: 2024-07-22 18:57:36
 //
 
-use crate::types;
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use anyhow::{Result, anyhow};
+use crate::models::users::UserRoles;
+use crate::models::tokens;
+use anyhow::Result;
 
 use axum::{
     extract::{Extension, FromRequestParts},
     http::{request::Parts, StatusCode},
 };
 
-use sqlx::Row;
-
 use std::collections::HashMap;
 
 pub struct RequireAuth {
-    pub role: types::UserRoles,
-}
-
-async fn token_is_valid(
-    pool: &sqlx::Pool<sqlx::Postgres>,
-    token: &str) -> Result<types::UserRoles, anyhow::Error> {
-
-    let row = sqlx::query(r#"
-        SELECT tokens.user_id, tokens.expires, users.role FROM tokens, users WHERE token = $1;
-    "#)
-        .bind(token)
-        .fetch_one(pool)
-        .await?;
-    
-    println!("TOKEN IS VALID: {}", token);
-
-    let role = row.get::<types::UserRoles, _>("role");
-    let expires = row.get::<NaiveDateTime, _>("expires");
-
-    // let expires_utc: DateTime<Utc> = DateTime::from_utc(expires, Utc);
-    let expires_utc: DateTime<Utc> = Utc.from_utc_datetime(&expires);
-
-    println!(">>> Expires: {}", expires);
-
-    let now: DateTime<Utc> = Utc::now();
-    if now > expires_utc {
-        // Remove the expired token
-        sqlx::query(r#"
-            DELETE FROM tokens WHERE token = $1;
-        "#)
-        .bind(token)
-        .execute(pool)
-        .await?;
-
-        return Err(anyhow!("Token expired"));
-    }
-
-    // if expired remove token
-
-    println!("Role {:?}: {:?}", role, expires);
-
-    Ok(role)
+    pub role: UserRoles,
 }
 
 #[axum::async_trait]
@@ -102,15 +59,15 @@ where
         if let Some(token) = cookies.get("token") {
             // println!("token: {}", token);
 
-            match token_is_valid(&pool, &token).await {
+            let token_manager = tokens::Tokens::new(pool);
+            match token_manager.is_valid(&token).await {
                 Ok(role) => {
                     return Ok(Self {
                         role,
                     });
                 },
                 Err(err) => println!("error: {:?}", err),
-            }
-
+            };
         }
 
         // if parts.method == axum::http::Method::GET && parts.uri.path() == "/admin" {
