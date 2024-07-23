@@ -1,7 +1,7 @@
 # store
 A sketch of an e-commerce store built with Rust, using PostgreSQL, Axum, and the Tera template engine.
 
-If you use ArchLinux install [PostgreSQL](https://wiki.archlinux.org/title/PostgreSQL) by following these commands.
+If using ArchLinux, install [PostgreSQL](https://wiki.archlinux.org/title/PostgreSQL) by following these commands:
 ```
 sudo pacman -S postgresql
 sudo -i -u postgres
