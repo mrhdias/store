@@ -130,10 +130,10 @@ pub struct ProductRowFrontend {
     permalink: String,
     description: String,
     short_description: String,
-    price: f32,
-    sale_price: f32,
-    regular_price: f32,
-    on_sale: bool,
+    price: f32, // current product price (read-only)
+    regular_price: f32, // product regular price
+    sale_price: f32, // product sale price
+    on_sale: bool, // shows if the product is on sale (read-only)
     stock_status: StockStatus,
     stock_quantity: i32,
     weight: i32,
@@ -149,10 +149,10 @@ pub struct ProductFrontend {
     permalink: String,
     description: String,
     short_description: String,
-    price: f32,
-    regular_price: f32,
-    sale_price: f32,
-    on_sale: bool,
+    price: f32, // current product price (read-only)
+    regular_price: f32, // product regular price
+    sale_price: f32, // product sale price
+    on_sale: bool, // shows if the product is on sale (read-only)
     stock_quantity: i32,
     stock_status: StockStatus,
     weight: i32,
@@ -554,7 +554,9 @@ pub struct ProductRowBackend {
     id: i32,
     sku: String,
     name: String,
-    regular_price: f32,
+    regular_price: f32, // product regular price
+    sale_price: f32, // product sale price
+    on_sale: bool, // shows if the product is on sale (read-only)
     stock_status: StockStatus,
     stock_quantity: i32,
     image_src: String,
@@ -572,10 +574,10 @@ pub struct ProductBackend {
     pub permalink: String,
     pub description: String,
     pub short_description: String,
-    pub price: f32,
-    pub sale_price: f32,
-    pub regular_price: f32,
-    pub on_sale: bool,
+    pub price: f32, // current product price (read-only)
+    pub regular_price: f32, // product regular price
+    pub sale_price: f32, // product sale price
+    pub on_sale: bool, // shows if the product is on sale (read-only)
     pub stock_status: StockStatus,
     pub stock_quantity: i32,
     pub status: Status,
@@ -644,20 +646,23 @@ impl<'a> Backend<'a> {
         images: &HashMap<i32, ImageOperation>,
         delete_media: bool) -> Result<(), anyhow::Error> {
         // Implementation to update a product
-    
+
         sqlx::query(r#"
             UPDATE products
-            SET name = $1, slug = $2, description = $3, short_description = $4,
-                sku = $5, price = $6, regular_price = $6,
-                stock_quantity = $7, stock_status= $8, permalink = $9, status = $10, primary_category = $11
-            WHERE id = $12;
+            SET name = $1, slug = $2, description = $3, short_description = $4, sku = $5,
+                price = $6, regular_price = $7, sale_price = $8, on_sale = $9,
+                stock_quantity = $10, stock_status= $11, permalink = $12, status = $13, primary_category = $14
+            WHERE id = $15;
         "#)
             .bind(&product.name)
             .bind(&product.slug)
             .bind(&product.description)
             .bind(&product.short_description)
             .bind(&product.sku)
+            .bind(&product.price)
             .bind(&product.regular_price)
+            .bind(&product.sale_price)
+            .bind(&product.on_sale)
             .bind(&product.stock_quantity)
             .bind(&product.stock_status)
             .bind(&product.permalink)
@@ -812,6 +817,11 @@ impl<'a> Backend<'a> {
                     Some(f) => f,
                     None => 0.00,
                 },
+                sale_price: match row.get::<Decimal, _>("sale_price").to_f32() {
+                    Some(f) => f,
+                    None => 0.00,
+                },
+                on_sale: row.get::<bool, _>("on_sale"),
                 stock_status: row.get::<StockStatus, _>("stock_status"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
                 image_src: row.get::<String, _>("image_src"),
@@ -891,14 +901,19 @@ impl<'a> Backend<'a> {
 
         let product_id: i32 = sqlx::query(r#"
             INSERT INTO products (
-                name, slug, description, sku, price, regular_price, stock_quantity, stock_status, permalink, status)
-            VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9) RETURNING id;
+                name, slug, description, sku,
+                price, regular_price, sale_price, on_sale,
+                stock_quantity, stock_status, permalink, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id;
         "#)
            .bind(&product.name)
            .bind(&product.slug)
            .bind(&product.description)
            .bind(&product.sku)
+           .bind(&product.price)
            .bind(&product.regular_price)
+           .bind(&product.sale_price)
+           .bind(&product.on_sale)
            .bind(&product.stock_quantity)
            .bind(&product.stock_status)
            .bind(&product.permalink)

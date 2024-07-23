@@ -155,12 +155,21 @@ textarea {
                 <summary>Product data</summary>
                 <div style="margin-top: 10px;">
                     <label for="product-sku">SKU:</label>
-                    <input id="product-sku" type="text" name="sku" value="{{ product.sku }}" placeholder="Product SKU" required>
+                    <input id="product-sku"
+                        type="text" name="sku" value="{{ product.sku }}"
+                        placeholder="Product SKU" required>
+
                     <label for="product-regular-price">Regular Price:</label>
                     <input id="product-regular-price" type="number"
                         placeholder="0.00" step="0.01" min="0"
                         name="regular_price" value="{{ product.regular_price | round_and_format(places=2) }}"
                         required>
+
+                    <label for="product-sale-price">Sale Price:</label>
+                    <input id="product-sale-price" type="number"
+                        placeholder="0.00" step="0.01" min="0"
+                        name="sale_price" value="{% if product.on_sale %}{{ product.sale_price | round_and_format(places=2) }}{% endif %}">
+
                     <label for="product-quantity">Quantity:</label>
                     <input id="product-quantity" type="number"
                         placeholder="0" step="1" min="0"

@@ -1,8 +1,6 @@
 //
-// Last Modification: 2024-07-22 22:30:01
+// Last Modification: 2024-07-23 19:28:24
 //
-
-pub mod media;
 
 use crate::types;
 use crate::utils;
@@ -111,6 +109,7 @@ pub async fn handle(
     Extension(mut tera): Extension<Tera>,
     mut multipart: Multipart) -> Html<String> {
 
+    let mut sale_price = 0.00;
     let mut category_name = "".to_string();
     let mut parent_category = 0;
     let mut categories_ids: Vec<i32> = vec![];
@@ -210,10 +209,25 @@ pub async fn handle(
             },
             "regular_price" => {
                 product.regular_price = match field.text().await {
-                    Ok(value) => value.parse().expect("Failed to parse the string to f32"),
+                    Ok(value) => value.parse().expect("Failed to parse the string from regular_price to f32"),
                     Err(e) => {
                         eprintln!("Error parsing product Regular Price: {}", e);
                         return Html("An error occurred while parsing product Regular Price".to_string());
+                    }
+                }
+            },
+            "sale_price" => {
+                sale_price = match field.text().await {
+                    Ok(value) => {
+                        if value.is_empty() {
+                            -1.00
+                        } else {
+                            value.parse().expect("Failed to parse the string from sale_price to f32")
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("Error parsing product Sale Price: {}", e);
+                        return Html("An error occurred while parsing product Sale Price".to_string());
                     }
                 }
             },
@@ -415,18 +429,19 @@ pub async fn handle(
         // println!("name: {:?}", field_name);
     }
 
+
+
     let categories_manager = categories::Categories::new(pool);
 
     if !category_name.is_empty() {
-        match categories_manager.add(&category_name, parent_category).await {
-            Ok(()) => {
-                println!("Category {} added successfully", category_name);
-            },
+        let category_id = match categories_manager.add(&category_name, parent_category).await {
+            Ok(id) => id,
             Err(e) => {
                 eprintln!("Error: {}", e);
-                return Html("An error occurred while adding new category.".to_string());
+                return Html("An error occurred while adding new category to the database.".to_string());
             }
         };
+        product.categories.push(category_id);
     }
 
     product.primary_category = 0;
@@ -456,6 +471,15 @@ pub async fn handle(
         }
     }
 
+    if sale_price < 0.00 {
+        product.sale_price = 0.00;
+        product.on_sale = false;
+    } else if sale_price < product.regular_price {
+        product.sale_price = sale_price;
+        product.on_sale = true;
+    }
+    product.price = product.sale_price;
+
     if product.slug.is_empty() {
         product.slug = slugify(&product.name);
     }
@@ -484,6 +508,7 @@ pub async fn handle(
         }
     };
 
+    println!("Product: {:?}", product);
     println!("Categories: {:?}", categories);
 
     if product.id == 0 { // new product to add
@@ -559,6 +584,8 @@ pub async fn edit(
             }
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
+
+            println!("Product: {:?}", product);
             
             let mut data = Context::new();
             data.insert("partial", "product");

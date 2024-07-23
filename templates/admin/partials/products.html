@@ -110,7 +110,12 @@ table.admin.product-list {
                 {% endif %}
                 ({{ product.stock_quantity }})
             </td>
-            <td>${{ product.regular_price | round_and_format(places=2) }}</td>
+            <td style="display: flex; flex-direction: column;">
+                <span {% if product.on_sale %}style="text-decoration:line-through;font-size:0.95em;"{% endif %}>${{ product.regular_price | round_and_format(places=2) }}</span>
+                {% if product.on_sale %}
+                    <span>${{ product.sale_price | round_and_format(places=2) }}<span>
+                {% endif %}
+            </td>
             <td>{{ product.status | capitalize }}<br />{{ product.date_created }}</td>
         </tr>
         {% endfor %}

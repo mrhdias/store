@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-22 19:00:37
+// Last Modification: 2024-07-23 19:29:36
 // References:
 // https://developer.mozilla.org/en-US/docs/Glossary/MVC
 //
@@ -8,6 +8,7 @@ pub mod users;
 pub mod tokens;
 pub mod categories;
 pub mod products;
+pub mod media;
 pub mod cart;
 pub mod orders;
 

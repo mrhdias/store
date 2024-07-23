@@ -5,6 +5,8 @@
 
 use slug::slugify;
 
+use sqlx::Row;
+
 use serde::{
     Serialize,
     Deserialize
@@ -50,19 +52,20 @@ impl Categories {
         Ok(categories)
     }
 
-    pub async fn add(&self, name: &str, parent: i32) -> Result<(), anyhow::Error> {
+    pub async fn add(&self, name: &str, parent: i32) -> Result<i32, anyhow::Error> {
         // Implementation to add a new category
-        sqlx::query(r#"
+        let category_id: i32 = sqlx::query(r#"
             INSERT INTO categories (name, slug, parent)
-            VALUES ($1, $2, $3);
+            VALUES ($1, $2, $3) RETURNING id;
         "#)
             .bind(&name)
             .bind(slugify(&name))
             .bind(&parent)
-            .execute(&self.pool)
-            .await?;
+            .fetch_one(&self.pool)
+            .await?
+            .get(0);
 
-        Ok(())
+        Ok(category_id)
     }
 
     pub fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
