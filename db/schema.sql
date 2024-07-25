@@ -1,5 +1,7 @@
 -- psql -W -U store_admin -d mystoredb -a -w -f schema.sql
 -- drop tables if exists
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS customer_sessions;
 DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS tokens;

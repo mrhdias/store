@@ -1,18 +1,20 @@
 //
-// Last Modified: 2024-07-18 19:30:51
+// Last Modified: 2024-07-25 19:35:33
 //
 
 use crate::models::cart;
 use crate::utils;
 use crate::notifications;
 use std::collections::HashMap;
+use regex::Regex;
 
+use anyhow;
 use axum::{
     extract::{Extension, Form},
     response::Html,
 };
 
-use axum_session_sqlx::SessionPgSession;
+use tower_sessions::Session;
 
 use tera::{Tera, Context};
 
@@ -73,65 +75,103 @@ struct Country {
 }
 
 
-struct ShippingTable {
+struct ShippingWeightTable {
     label: String,
-    postalcode: Vec<[i32; 2]>,
-    prices: Vec<[f32; 2]>,
-    freeshipping: f32
+    postalcode_regex: Vec<String>,
+    prices: Vec<(u32, f32)>,
+    freeshipping: f32,
 }
 
-/*
-{
-    "PT": [
-        {
-            "label": "mainland",
-            "postalcode": [
-                [1000, 8900]
+fn calculate_shipping(
+    country: &str,
+    postalcode: &str,
+    total_weight: &u32,
+    total_order: &f32) -> Result<f32, anyhow::Error> {
+
+    let mut countries = HashMap::new();
+    countries.insert("PT".to_string(), vec![
+        ShippingWeightTable {
+            label: "mainland".to_string(),
+            postalcode_regex: vec![r#"^[12345678]\d+"#.to_string()],
+            prices: vec![
+                (1000, 4.90),
+                (2000, 8.30),
+                (3000, 12.70),
+                (4000, 17.10),
+                (5000, 21.50),
             ],
-            "prices": [
-                [1000, 4.90],
-                [2000, 8.30],
-                [3000, 12.70],
-                [4000, 17.10],
-                [5000, 21.50]
-            ],
-            "freeshipping": 300
+            freeshipping: 100.0,
         },
-        {
-            "label": "madeira",
-            "postalcode": [
-                [9000, 9385]
+        ShippingWeightTable {
+            label: "madeira".to_string(),
+            postalcode_regex: vec![r#"^9[012344]\d+"#.to_string()],
+            prices: vec![
+                (1000, 5.90),
+                (2000, 9.30),
+                (3000, 13.70),
+                (4000, 18.10),
+                (5000, 22.50)
             ],
-            "prices": [
-                [1000, 4.90],
-                [2000, 8.30],
-                [3000, 12.70],
-                [4000, 17.10],
-                [5000, 21.50]
-            ],
-            "freeshipping": 300
+            freeshipping: 100.0,
         },
-        {
-            "label": "acores",
-            "postalcode": [
-                [9500, 9980]
+        ShippingWeightTable {
+            label: "acores".to_string(),
+            postalcode_regex: vec![r#"^9[56789]\d+"#.to_string()],
+            prices: vec![
+                (1000, 6.90),
+                (2000, 10.30),
+                (3000, 14.70),
+                (4000, 19.10),
+                (5000, 23.50)
             ],
-            "prices": [
-                [1000, 4.90],
-                [2000, 8.30],
-                [3000, 12.70],
-                [4000, 17.10],
-                [5000, 21.50]
+            freeshipping: 300.0,
+        },
+    ]);
+    countries.insert("ES".to_string(), vec![
+        ShippingWeightTable {
+            label: "mainland".to_string(),
+            postalcode_regex: vec![],
+            prices: vec![
+                (1000, 7.90),
+                (2000, 11.30),
+                (3000, 15.70),
+                (4000, 20.10),
+                (5000, 24.50)
             ],
-            "freeshipping": 300
+            freeshipping: 100.0,
+        },
+    ]);
+
+    if countries.is_empty() {
+        return Err(anyhow::anyhow!("shipping tables is empty"));
+    }
+
+    if !countries.contains_key(country) {
+        return Err(anyhow::anyhow!("shipping table not found for country: {}", country));
+    }
+
+    let country_tables = countries.get(country).unwrap();
+    for table in country_tables {
+        if total_order >= &table.freeshipping {
+            return Ok(0.00);
         }
-    ]
+        for pattern in &table.postalcode_regex {
+            let regex = Regex::new(&pattern).unwrap();
+            if regex.is_match(postalcode) {
+                for (weight, price) in &table.prices {
+                    if total_weight <= &weight {
+                        return Ok(*price);
+                    }
+                }
+                return Err(anyhow::anyhow!("price shipping not found for weight: {}/{}", country, total_weight));
+            }
+        }
+    }
+    return Err(anyhow::anyhow!("shipping table is empty for country: {}", country));
 }
-
-*/
 
 pub async fn place_order(
-    session: SessionPgSession,
+    session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>,
     Form(payload): Form<Order>) -> Html<String> {
@@ -139,7 +179,7 @@ pub async fn place_order(
     println!("Order Billing: {:?}", payload);
 
     if Some(payload.calculate_shipping).is_some() {
-        let mut current_cart: HashMap<i32, i32> = match session.get("cart") {
+        let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
             Some(cart) => cart,
             None => HashMap::new()
         };
@@ -147,7 +187,7 @@ pub async fn place_order(
         let mut cart = cart::Cart::new(pool, &mut current_cart);
         match cart.get().await {
             Ok(products) => {
-                session.set("cart", current_cart);
+                session.insert("cart", current_cart).await.unwrap();
 
                 tera.register_filter("round_and_format", utils::round_and_format_filter);
 
@@ -221,11 +261,11 @@ pub async fn place_order(
 }
 
 pub async fn show(
-    session: SessionPgSession,
+    session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
-    let mut current_cart: HashMap<i32, i32> = match session.get("cart") {
+    let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
         Some(cart) => cart,
         None => HashMap::new()
     };
@@ -233,7 +273,7 @@ pub async fn show(
     let mut cart = cart::Cart::new(pool, &mut current_cart);
     match cart.get().await {
         Ok(products) => {
-            session.set("cart", current_cart);
+            session.insert("cart", current_cart).await.unwrap();
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
 

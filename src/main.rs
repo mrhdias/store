@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-22 18:41:41
+// Last Modified: 2024-07-24 20:02:04
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -16,18 +16,15 @@
 //
 
 mod models;
+mod controllers;
 mod types;
-mod products;
-mod cart;
-mod checkout;
-mod admin;
 mod utils;
-mod shortcodes;
-mod auth;
 mod notifications;
 
-use chrono::Duration;
+use anyhow;
 use std::collections::HashMap;
+use time::Duration;
+use std::process::exit;
 
 use axum::{
     extract::{Extension, Form, Query, Request},
@@ -46,16 +43,16 @@ use tower_http::{
     normalize_path::NormalizePathLayer,
 };
 
+use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions_sqlx_store::PostgresStore;
+
 use tera::{Tera, Context};
 
 use sqlx::postgres::PgPoolOptions;
 
-use axum_session::{SessionConfig, SessionLayer};
-use axum_session_sqlx::SessionPgSessionStore;
-
 use std::path::{Path, PathBuf};
 use ini::Ini;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const APP_NAME: &str = "store";
 
@@ -63,6 +60,15 @@ const APP_NAME: &str = "store";
 struct LoginForm {
     user: String,
     password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DatabaseConf {
+    host: String,
+    user: String,
+    password: String,
+    name: String,
+    max_connections: u32,
 }
 
 async fn autentication(
@@ -136,6 +142,52 @@ async fn home(
     Html(rendered)
 }
 
+fn load_config(ini_file: &PathBuf) -> Result<DatabaseConf, anyhow::Error> {
+
+    let config = match Ini::load_from_file(&ini_file) {
+        Ok(config) => config,
+        Err(err) => {
+            return Err(anyhow::anyhow!("failed to parse config file: {}", err));
+        }
+    };
+
+    // localhost, store_admin, PreviewSem100, mystoredb
+
+    let db_settings = match config.section(Some("database")) {
+        Some(settings) => settings,
+        None => return Err(anyhow::anyhow!("database section not found in config file")),
+    };
+
+    let db_conf = DatabaseConf {
+        host: match db_settings.get("host") {
+            Some(value) => value.to_string(),
+            None => return Err(anyhow::anyhow!("invalid db host value")),
+        },
+        user: match db_settings.get("user") {
+            Some(value) => value.to_string(),
+            None => return Err(anyhow::anyhow!("invalid db uservalue")),
+        },
+        password: match db_settings.get("password") {
+            Some(value) => value.to_string(),
+            None => return Err(anyhow::anyhow!("invalid db password value")),
+        },
+        name: match db_settings.get("name") {
+            Some(value) => value.to_string(),
+            None => return Err(anyhow::anyhow!("invalid db name value")),
+        },
+        max_connections: match db_settings.get("max_connections") {
+            Some(value) => match value.parse() {
+                Ok(value) => value,
+                Err(err) => {
+                    return Err(anyhow::anyhow!("invalid max_connections: {}", err));
+                }
+            },
+            None => 5,
+        },
+    };
+
+    Ok(db_conf)
+}
 
 fn default_config_file(config_dir: &PathBuf) {
 
@@ -158,91 +210,90 @@ fn default_config_file(config_dir: &PathBuf) {
 async fn main() {
 
     let config_dir: PathBuf = Path::new(".").join("config");
+    if !config_dir.exists() {
+        std::fs::create_dir(&config_dir).expect("Failed to create config directory");
+    }
     let ini_file = config_dir.join(format!("{}.ini", APP_NAME));
 
     println!("Config Directory: {:?}", ini_file.display());
 
     if !ini_file.exists() {
         default_config_file(&config_dir);
+        println!("Take some time to check the configuration file: {}", ini_file.display());
+        exit(0);
     }
 
-    let config = match Ini::load_from_file(&ini_file) {
-        Ok(config) => config,
-        Err(err) => {
-            panic!("failed to parse config file: {}", err);
+    let db_conf= match load_config(&ini_file) {
+        Ok(conf) => conf,
+        Err(e) => {
+            panic!("Error loading database configuration: {}", e);
         }
     };
 
-    // localhost, store_admin, PreviewSem100, mystoredb
-
-    let db_settings = config.section(Some("database")).expect("no database section in config file");
-    let db_host = db_settings.get("host").expect("no database host");
-    let db_user = db_settings.get("user").expect("no database user");
-    let db_password = db_settings.get("password").expect("no database password");
-    let db_name = db_settings.get("name").expect("no database name");
-    let db_max_connections: u32 = match db_settings.get("max_connections") {
-        Some(value) => match value.parse() {
-            Ok(value) => value,
-            Err(_) => {
-                panic!("invalid max_connections value");
-            }
-        },
-        None => 5,
-    };
-
     let pool = PgPoolOptions::new()
-        .max_connections(db_max_connections)
-        .connect(&format!("postgres://{}:{}@{}/{}", db_user, db_password, db_host, db_name))
+        .max_connections(db_conf.max_connections)
+        .connect(&format!("postgres://{}:{}@{}/{}",
+            db_conf.user,
+            db_conf.password,
+            db_conf.host,
+            db_conf.name))
         .await
         .expect("Failed to make connection pool");
 
-    let session_config = SessionConfig::default()
-        .with_table_name("user_sessions")
-        .with_max_age(Some(Duration::hours(1)));
+    // https://github.com/maxcountryman/tower-sessions
+    // => \dt *.*
+    let session_store = PostgresStore::new(pool.clone())
+        // .with_schema_name("test_schema").unwrap()
+        .with_table_name("store_sessions").unwrap();
 
-    // create SessionStore and initiate the database tables
-    let session_store = SessionPgSessionStore::new(Some(pool.clone().into()), session_config)
-        .await
-        .expect("Failed to create session store");
+    match session_store.migrate().await {
+        Ok(()) => println!("Migration successful"),
+        Err(e) => {
+            panic!("Error during migration: {}", e);
+        }
+    };
+
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_expiry(Expiry::OnInactivity(Duration::hours(1)))
+        .with_secure(false);
 
     let tera = Tera::new("templates/**/*").unwrap();
 
     // build our application with a single route
     let app = Router::new()
-        .route("/admin/media", get(admin::media::library))
+        .route("/admin/media", get(controllers::backend::media::library))
         // admin products
         // .route("/admin/products/:id/media/update", post(admin::products::media::update))
         // .route("/admin/products/:id/media/add", post(admin::products::media::add))
         // .route("/admin/products/:id/media", post(admin::products::media::select))
-        .route("/admin/products/:id", get(admin::products::edit)
-            .post(admin::products::handle))
-        .route("/admin/products/new", get(admin::products::new))
-        .route("/admin/products", get(admin::products::list))
-        .route("/admin/users/:id", get(admin::users::edit))
-        .route("/admin/users", get(admin::users::list))
+        .route("/admin/products/:id", get(controllers::backend::products::edit)
+            .post(controllers::backend::products::handle))
+        .route("/admin/products/new", get(controllers::backend::products::new))
+        .route("/admin/products", get(controllers::backend::products::list))
+        .route("/admin/users/:id", get(controllers::backend::users::edit))
+        .route("/admin/users", get(controllers::backend::users::list))
         // admin
-        .route("/admin/sidebar", get(admin::sidebar))
-        .route("/admin", get(admin::dashboard))
-        .route_layer(from_extractor::<auth::RequireAuth>())
+        .route("/admin/sidebar", get(controllers::admin::sidebar))
+        .route("/admin", get(controllers::admin::dashboard))
+        .route_layer(from_extractor::<controllers::auth::RequireAuth>())
         .route("/", get(home))
         .route("/test", get(|| async { "Hello, World!" }))
         .route("/login", get(login).post(autentication))
-        .route("/checkout", get(checkout::show).post(checkout::place_order))
-        .route("/cart/update", post(cart::update_cart))
-        .route("/cart/add", post(cart::add_to_cart))
-        .route("/cart", get(cart::show))
-        .route("/products", get(products::list))
-        .route("/product-category/:slug", get(products::product_category))
-        .route("/product/:slug", get(products::product))
-        .route("/shortcode/products", get(shortcodes::products))
+        .route("/checkout", get(controllers::frontend::checkout::show)
+            .post(controllers::frontend::checkout::place_order))
+        .route("/cart/update", post(controllers::frontend::cart::update_cart))
+        .route("/cart/add", post(controllers::frontend::cart::add_to_cart))
+        .route("/cart", get(controllers::frontend::cart::show))
+        .route("/products", get(controllers::frontend::products::list))
+        .route("/product-category/:slug", get(controllers::frontend::products::product_category))
+        .route("/product/:slug", get(controllers::frontend::products::product))
+        .route("/shortcode/products", get(controllers::frontend::shortcodes::products))
         .layer(Extension(pool))
         .layer(Extension(tera))
-        .layer(SessionLayer::new(session_store))
         // .nest_service("/assets", ServeDir::new("static/assets"))
         // .nest_service("/uploads", ServeDir::new("static/uploads"))
+        .layer(session_layer)
         .fallback_service(ServeDir::new("static"));
-
-
 
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);
 

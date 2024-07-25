@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-03 16:45:16
+// Last Modified: 2024-07-25 19:32:25
 //
 
 use crate::utils;
@@ -17,17 +17,17 @@ use tera::{
     Context
 };
 
-use axum_session_sqlx::SessionPgSession;
+use tower_sessions::Session;
 
 pub async fn update_cart(
-    session: SessionPgSession,
+    session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>,
     RawForm(form): RawForm) -> Html<String> {
 
     let raw_form_data = String::from_utf8(form.to_vec()).unwrap();
 
-    let mut current_cart: HashMap<i32, i32> = match session.get("cart") {
+    let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
         Some(cart) => cart,
         None => HashMap::new()
     };
@@ -37,7 +37,8 @@ pub async fn update_cart(
 
     match cart.get().await {
         Ok(products) => {
-            session.set("cart", current_cart);
+            // session.set("cart", current_cart);
+            session.insert("cart", current_cart).await.unwrap();
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
 
@@ -56,12 +57,12 @@ pub async fn update_cart(
 }
 
 pub async fn add_to_cart(
-    session: SessionPgSession,
+    session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>,
     Form(payload): Form<cart::ProductToCart>) -> Html<String> {
 
-    let mut current_cart: HashMap<i32, i32> = match session.get("cart") {
+    let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
         Some(cart) => cart,
         None => HashMap::new()
     };
@@ -71,7 +72,7 @@ pub async fn add_to_cart(
 
     match cart.get().await {
         Ok(products) => {
-            session.set("cart", current_cart);
+            session.insert("cart", current_cart).await.unwrap();
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
 
@@ -90,11 +91,11 @@ pub async fn add_to_cart(
 }
 
 pub async fn show(
-    session: SessionPgSession,
+    session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
-    let mut current_cart: HashMap<i32, i32> = match session.get("cart") {
+    let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
         Some(cart) => cart,
         None => HashMap::new()
     };
@@ -102,7 +103,7 @@ pub async fn show(
     let mut cart = cart::Cart::new(pool, &mut current_cart);
     match cart.get().await {
         Ok(products) => {
-            session.set("cart", current_cart);
+            session.insert("cart", current_cart).await.unwrap();
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
 

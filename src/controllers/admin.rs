@@ -1,12 +1,8 @@
 //
-// Last Modification: 2024-07-22 19:06:14
+// Last Modification: 2024-07-24 18:47:23
 //
 
-pub mod media;
-pub mod products;
-pub mod users;
-
-use crate::auth;
+use crate::controllers::auth;
 
 use axum::{
     extract::Extension,

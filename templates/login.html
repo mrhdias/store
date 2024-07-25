@@ -7,36 +7,40 @@
     <link rel="stylesheet" href="assets/css/store.css?v=2024060220">
 
 <style>
-#login {
+fieldset {
+    width: 160px;
+    margin: 0 auto;
+    padding: 15px;
+}
+fieldset > #login {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    width: 160px;
     align-items: flex-start;
-    margin: 0 auto;
-    padding: 20px;
     background-color: #fff;
-    border: 1px solid #c3c4c7;
 }
 </style>
 </head>
 <body>
 
     <main>
-        <div>
+        <div style="padding: 20px;">
             <a href="/" style="display:block;text-align:center;padding: 20px 0 10px 0;">
                 <img src="/assets/images/logo.png" alt="logo" style="width:auto;height:60px;">
             </a>
-            <form id="login" method="post" action="/login">
-                {% if alert %}
-                <span class="alert">{{ alert }}</span>
-                {% endif %}
-                <label for="user">Username:</label>
-                <input id="user" type="text" name="user" placeholder="user" value="demo@example.com" required>
-                <label for="password">Password:</label>
-                <input id="password" type="password" name="password" placeholder="password" minlength="8" value="123456789" required>
-                <input type="submit" name="submit" value="Log in" style="align-self: self-end;">
-            </form>
+            <fieldset>
+                <legend>Login</legend>
+                <form id="login" method="post" action="/login">
+                    {% if alert %}
+                    <span class="alert">{{ alert }}</span>
+                    {% endif %}
+                    <label for="user">Username:</label>
+                    <input id="user" type="text" name="user" placeholder="user" value="demo@example.com" required>
+                    <label for="password">Password:</label>
+                    <input id="password" type="password" name="password" placeholder="password" minlength="8" value="12345678" required>
+                    <input type="submit" name="submit" value="Log in" style="align-self: self-end;">
+                </form>
+            </fieldset>
         </div>
     </main>
 

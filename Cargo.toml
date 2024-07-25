@@ -6,23 +6,26 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["form", "multipart"] }
-axum_session = "0.14.0"
-axum_session_sqlx = "0.1.0"
+axum_session_auth = { version = "0.14.0", features = ["advanced"] }
 chrono = "0.4.38"
 decimal = "2.1.0"
 lettre = { version = "0.11.7", features = ["tokio1-native-tls"] }
 num-traits = "0.2.19"
+regex = "1.10.5"
 rust-ini = "0.21.0"
 rust_decimal = "1.35.0"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.117"
 slug = "0.1.5"
-sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio", "json", "rust_decimal"] }
+sqlx = { version = "0.7.4", features = ["postgres", "runtime-tokio", "json", "rust_decimal", "chrono"] }
 strum = { version = "0.26", features = ["derive"] }
 tera = { version = "1.20.0", features = ["builtins"] }
+time = "0.3.36"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
 tower = "0.4.13"
 tower-http = { version = "0.5.2", features = ["tower", "fs", "normalize-path"] }
+tower-sessions = "0.12.2"
+tower-sessions-sqlx-store = { version = "0.12.0", features = ["postgres"] }
 typed-headers = "0.2.0"
 url = "2.5.1"
 uuid = { version = "1.9.1", features = ["v4"] }
