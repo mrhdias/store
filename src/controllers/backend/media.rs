@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-06-27 12:05:50
+// Last Modification: 2024-07-27 18:36:44
 //
 
 use crate::models::media;
@@ -26,6 +26,6 @@ pub async fn library(
 
     let mut data = Context::new();
     data.insert("library", &rows);
-    let rendered = tera.render("admin/media.html", &data).unwrap();
+    let rendered = tera.render("backend/media.html", &data).unwrap();
     Html(rendered)
 }

@@ -1,4 +1,13 @@
 <style>
+
+.alert {
+    display: block;
+    background-color: #eee;
+    padding: 6px 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
 form {
     display: flex;
     flex-direction: row;
@@ -46,6 +55,11 @@ table th:last-child, table td:last-child {
     text-align: right;
 }
 </style>
+
+
+{% if alert %}
+<span class="alert">{{ alert }}</span>
+{% endif %}
 
 <form name="checkout" method="post" action="/checkout">
     <section>
@@ -201,12 +215,12 @@ table th:last-child, table td:last-child {
                     <td>${{ total | round_and_format(places=2) }}</td>
                 </tr>
                 <tr>
-                    <td>Shipping <button type="submit" name="calculate_shipping" value="true">{% if shipping_total > 0 %}
+                    <td>Shipping <button type="submit" name="calculate_shipping" value="true">{% if shipping_total >= 0 %}
                         Recalculate
                     {% else %}
                         Calculate
                     {% endif %}</button></td>
-                    <td>{% if shipping_total > 0 %}
+                    <td>{% if shipping_total >= 0 %}
                         ${{ shipping_total | round_and_format(places=2) }}
                     {% else %}
                         Enter shipping address

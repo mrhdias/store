@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-22 19:11:15
+// Last Modification: 2024-07-27 19:20:38
 //
 
 use crate::types;
@@ -7,7 +7,11 @@ use crate::utils;
 use crate::models::products;
 
 use axum::{
-    extract::{Extension, Path, Query},
+    extract::{
+        Extension,
+        Path,
+        Query
+    },
     response::Html,
 };
 
@@ -23,7 +27,10 @@ pub async fn product(
 
     let products_manager = products::Products::new(pool).await;
 
-    match products_manager.frontend().get_one_by_slug(&slug).await {
+    match products_manager
+        .frontend()
+        .get_one_by_slug(&slug)
+        .await {
         Ok(product) => {
             println!("select product with PgRow:\n{:?}", product);
 
@@ -32,7 +39,7 @@ pub async fn product(
             let mut data = Context::new();
             data.insert("product", &product);
         
-            let rendered = tera.render("single_product.html", &data).unwrap();
+            let rendered = tera.render("frontend/product.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {
@@ -96,7 +103,7 @@ pub async fn product_category(
                 data.insert("total_products", &total);
                 data.insert("per_page", &per_page);
                 data.insert("total_pages", &total_pages);
-                let rendered = tera.render("list_products.html", &data).unwrap();
+                let rendered = tera.render("frontend/products.html", &data).unwrap();
                 Html(rendered)
             },
             Err(e) => {
@@ -116,7 +123,10 @@ pub async fn list(
 
     let per_page = pagination.per_page.unwrap_or(3);
     
-    let total = match products_manager.frontend().count_all(Some(products::Status::Publish)).await {
+    let total = match products_manager
+        .frontend()
+        .count_all(Some(products::Status::Publish))
+        .await {
         Ok(t) => t,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -162,7 +172,7 @@ pub async fn list(
             data.insert("total_products", &total);
             data.insert("per_page", &per_page);
             data.insert("total_pages", &total_pages);
-            let rendered = tera.render("list_products.html", &data).unwrap();
+            let rendered = tera.render("frontend/products.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {

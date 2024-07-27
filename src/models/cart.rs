@@ -1,8 +1,8 @@
 //
-// Last Modification: 2024-07-22 11:13:10
+// Last Modification: 2024-07-27 17:50:15
 //
 
-use anyhow;
+use anyhow::{self, Ok};
 use std::collections::HashMap;
 use num_traits::ToPrimitive;
 use serde::{Serialize, Deserialize};
@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 use sqlx::{
     types::{Decimal, Json},
     FromRow,
-    Row
+    Row,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,6 +29,7 @@ pub struct Product {
     name: String,
     price: f32,
     quantity: i32,
+    weight: u32,
     permalink: String,
     image: Json<Media>,
 }
@@ -42,6 +43,8 @@ pub struct ProductToCart {
 pub struct Cart<'a> {
     pool: sqlx::Pool<sqlx::Postgres>,
     cart: &'a mut HashMap<i32, i32>,
+    pub total_weight: u32,
+    pub total_order: f32,
 }
 
 impl<'a> Cart<'a> {
@@ -92,7 +95,7 @@ impl<'a> Cart<'a> {
         let products = sqlx::query(r#"
             SELECT
                 products.id, products.name, products.permalink, products.price,
-                products.stock_quantity, products.stock_status, (
+                products.stock_quantity, products.weight, products.stock_status, (
                 SELECT json_build_object(
                     'id', media.id,
                     'src', media.src,
@@ -107,32 +110,42 @@ impl<'a> Cart<'a> {
             WHERE products.id = ANY($1) AND products.status = 'publish';
         "#)
             .bind(product_ids)
-            .map(|row| Product {
-                id: row.get::<i32, _>("id"),
-                name: row.get::<String, _>("name"),
-                price: match row.get::<Decimal, _>("price").to_f32() {
-                    Some(f) => f,
-                    None => 0.00,
-                },
-                quantity: match self.cart.get(&row.get::<i32, _>("id")) {
-                    Some(q) => {
-                        let id = &row.get::<i32, _>("id");
-                        let stock_quantity = row.get::<i32, _>("stock_quantity");
-                        
-                        let mut quantity = *q;
-                        if stock_quantity == 0 {
-                            self.cart.remove(id);
-                            quantity = 0;
-                        } else if *q > stock_quantity {
-                            quantity = stock_quantity;
-                        }
-                        quantity
-    
+            .map(|row| -> Product {
+
+                let product = Product {
+                    id: row.get::<i32, _>("id"),
+                    name: row.get::<String, _>("name"),
+                    price: match row.get::<Decimal, _>("price").to_f32() {
+                        Some(f) => f,
+                        None => 0.00,
                     },
-                    None => 0,
-                },
-                permalink: row.get::<String, _>("permalink"),
-                image: row.get::<Json<Media>, _>("image"),
+                    quantity: match self.cart.get(&row.get::<i32, _>("id")) {
+                        Some(q) => {
+                            let id = &row.get::<i32, _>("id");
+                            let stock_quantity = row.get::<i32, _>("stock_quantity");
+                            
+                            let mut quantity = *q;
+                            if stock_quantity == 0 {
+                                self.cart.remove(id);
+                                quantity = 0;
+                            } else if *q > stock_quantity {
+                                quantity = stock_quantity;
+                            }
+                
+                            quantity
+                
+                        },
+                        None => 0,
+                    },
+                    weight: row.get::<i32, _>("weight") as u32,
+                    permalink: row.get::<String, _>("permalink"),
+                    image: row.get::<Json<Media>, _>("image"),
+                };
+
+                self.total_weight += product.weight * product.quantity as u32;
+                self.total_order += product.price * product.quantity as f32;
+
+                product
             })
             .fetch_all(&self.pool)
             .await?;
@@ -148,6 +161,8 @@ impl<'a> Cart<'a> {
         Cart {
             pool,
             cart,
+            total_weight: 0,
+            total_order: 0.00,
         }
     }
 }

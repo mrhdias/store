@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-25 19:32:25
+// Last Modified: 2024-07-27 19:16:34
 //
 
 use crate::utils;
@@ -46,7 +46,7 @@ pub async fn update_cart(
             data.insert("partial", "cart");
             data.insert("title", "Cart");
             data.insert("cart", &products);
-            let rendered = tera.render("shopping.html", &data).unwrap();
+            let rendered = tera.render("frontend/shopping.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {
@@ -80,7 +80,7 @@ pub async fn add_to_cart(
             data.insert("partial", "cart");
             data.insert("title", "Cart");
             data.insert("cart", &products);
-            let rendered = tera.render("shopping.html", &data).unwrap();
+            let rendered = tera.render("frontend/shopping.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {
@@ -111,7 +111,7 @@ pub async fn show(
             data.insert("partial", "cart");
             data.insert("title", "Cart");
             data.insert("cart", &products);
-            let rendered = tera.render("shopping.html", &data).unwrap();
+            let rendered = tera.render("frontend/shopping.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {

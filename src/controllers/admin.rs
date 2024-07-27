@@ -21,7 +21,7 @@ pub async fn sidebar(
 
 
     let data = Context::new();
-    let rendered = tera.render("admin/sidebar.html", &data).unwrap();
+    let rendered = tera.render("backend/sidebar.html", &data).unwrap();
     Html(rendered)
 }
 
@@ -33,6 +33,6 @@ pub async fn dashboard(
 
     let mut data = Context::new();
     data.insert("partial", "dashboard");
-    let rendered = tera.render("admin/admin.html", &data).unwrap();
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)
 }

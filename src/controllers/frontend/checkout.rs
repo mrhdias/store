@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-25 19:35:33
+// Last Modified: 2024-07-27 19:16:14
 //
 
 use crate::models::cart;
@@ -77,14 +77,14 @@ struct Country {
 
 struct ShippingWeightTable {
     label: String,
-    postalcode_regex: Vec<String>,
+    postcode_regex: Vec<String>,
     prices: Vec<(u32, f32)>,
     freeshipping: f32,
 }
 
 fn calculate_shipping(
     country: &str,
-    postalcode: &str,
+    postcode: &str,
     total_weight: &u32,
     total_order: &f32) -> Result<f32, anyhow::Error> {
 
@@ -92,7 +92,7 @@ fn calculate_shipping(
     countries.insert("PT".to_string(), vec![
         ShippingWeightTable {
             label: "mainland".to_string(),
-            postalcode_regex: vec![r#"^[12345678]\d+"#.to_string()],
+            postcode_regex: vec![r#"^[12345678]\d+"#.to_string()],
             prices: vec![
                 (1000, 4.90),
                 (2000, 8.30),
@@ -104,7 +104,7 @@ fn calculate_shipping(
         },
         ShippingWeightTable {
             label: "madeira".to_string(),
-            postalcode_regex: vec![r#"^9[012344]\d+"#.to_string()],
+            postcode_regex: vec![r#"^9[01234]\d+"#.to_string()],
             prices: vec![
                 (1000, 5.90),
                 (2000, 9.30),
@@ -112,11 +112,11 @@ fn calculate_shipping(
                 (4000, 18.10),
                 (5000, 22.50)
             ],
-            freeshipping: 100.0,
+            freeshipping: 200.0,
         },
         ShippingWeightTable {
             label: "acores".to_string(),
-            postalcode_regex: vec![r#"^9[56789]\d+"#.to_string()],
+            postcode_regex: vec![r#"^9[56789]\d+"#.to_string()],
             prices: vec![
                 (1000, 6.90),
                 (2000, 10.30),
@@ -130,7 +130,7 @@ fn calculate_shipping(
     countries.insert("ES".to_string(), vec![
         ShippingWeightTable {
             label: "mainland".to_string(),
-            postalcode_regex: vec![],
+            postcode_regex: vec![],
             prices: vec![
                 (1000, 7.90),
                 (2000, 11.30),
@@ -152,12 +152,12 @@ fn calculate_shipping(
 
     let country_tables = countries.get(country).unwrap();
     for table in country_tables {
-        if total_order >= &table.freeshipping {
-            return Ok(0.00);
-        }
-        for pattern in &table.postalcode_regex {
+        for pattern in &table.postcode_regex {
             let regex = Regex::new(&pattern).unwrap();
-            if regex.is_match(postalcode) {
+            if regex.is_match(postcode) {
+                if total_order >= &table.freeshipping {
+                    return Ok(0.00);
+                }
                 for (weight, price) in &table.prices {
                     if total_weight <= &weight {
                         return Ok(*price);
@@ -167,7 +167,8 @@ fn calculate_shipping(
             }
         }
     }
-    return Err(anyhow::anyhow!("shipping table is empty for country: {}", country));
+
+    Err(anyhow::anyhow!("unable to calculate the shipping for country/postcode: {}/{}", country, postcode))
 }
 
 pub async fn place_order(
@@ -187,6 +188,26 @@ pub async fn place_order(
         let mut cart = cart::Cart::new(pool, &mut current_cart);
         match cart.get().await {
             Ok(products) => {
+
+                let total_weight = cart.total_weight;
+                println!("Total weight: {}", total_weight);
+
+                let mut alert = "".to_string();
+                let total_shipping = match calculate_shipping(
+                    &payload.shipping_country,
+                    &payload.shipping_postcode,
+                    &cart.total_weight,
+                    &cart.total_order) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            eprintln!("Error calculating shipping: {}", e);
+                            alert = format!("Error calculating shipping: {}", e);
+                            -1.00
+                        }
+                    };
+
+                println!("Shipping Total: {}", total_shipping);
+
                 session.insert("cart", current_cart).await.unwrap();
 
                 tera.register_filter("round_and_format", utils::round_and_format_filter);
@@ -209,6 +230,9 @@ pub async fn place_order(
                 let mut data = Context::new();
                 data.insert("partial", "checkout");
                 data.insert("title", "Checkout");
+                if !alert.is_empty() {
+                    data.insert("alert", &alert);
+                }
                 data.insert("countries", &countries);
                 data.insert("billing", &Billing {
                     first_name: payload.billing_first_name,
@@ -241,8 +265,8 @@ pub async fn place_order(
                     None => "".to_string(),
                 });
                 data.insert("cart", &products);
-                data.insert("shipping_total", &1.00);
-                let rendered = tera.render("shopping.html", &data).unwrap();
+                data.insert("shipping_total", &total_shipping);
+                let rendered = tera.render("frontend/shopping.html", &data).unwrap();
                 Html(rendered)
             },
             Err(e) => {
@@ -319,7 +343,7 @@ pub async fn show(
             data.insert("order_comments", "");
             data.insert("cart", &products);
             data.insert("shipping_total", &0.00);
-            let rendered = tera.render("shopping.html", &data).unwrap();
+            let rendered = tera.render("frontend/shopping.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {

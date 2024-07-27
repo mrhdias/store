@@ -26,6 +26,10 @@
     padding: 20px;
 }
 
+summary {
+    cursor: pointer;
+}
+
 textarea {
     width: 100%;
     resize: none;
@@ -153,7 +157,7 @@ textarea {
 
             <details class="section">
                 <summary>Product data</summary>
-                <div style="margin-top: 10px;">
+                <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin-top: 10px;">
                     <label for="product-sku">SKU:</label>
                     <input id="product-sku"
                         type="text" name="sku" value="{{ product.sku }}"
@@ -174,6 +178,12 @@ textarea {
                     <input id="product-quantity" type="number"
                         placeholder="0" step="1" min="0"
                         name="stock_quantity" value="{{ product.stock_quantity }}"
+                        required>
+
+                    <label for="product-weight">Weight (g):</label>
+                    <input id="product-weight" type="number"
+                        placeholder="0" step="1" min="0"
+                        name="weight" value="{{ product.weight }}"
                         required>
                 </div>
             </details>

@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-23 19:28:24
+// Last Modification: 2024-07-27 19:20:48
 //
 
 use crate::types;
@@ -109,7 +109,7 @@ pub async fn handle(
     Extension(mut tera): Extension<Tera>,
     mut multipart: Multipart) -> Html<String> {
 
-    let mut sale_price = 0.00;
+    let mut sale_price = -1.00;
     let mut category_name = "".to_string();
     let mut parent_category = 0;
     let mut categories_ids: Vec<i32> = vec![];
@@ -128,6 +128,7 @@ pub async fn handle(
         on_sale: false,
         stock_status: products::StockStatus::OutOfStock,
         stock_quantity: 0,
+        weight: 0,
         permalink: "".to_string(),
         status: products::Status::Draft,
         primary_category: 0,
@@ -202,17 +203,17 @@ pub async fn handle(
                 product.sku = match field.text().await {
                     Ok(value) => value,
                     Err(e) => {
-                        eprintln!("Error parsing product SKU: {}", e);
-                        return Html("An error occurred while parsing product SKU".to_string());
+                        eprintln!("Error parsing the product field \"sku\": {}", e);
+                        return Html("An error occurred while parsing the product field \"sku\"".to_string());
                     }
                 }
             },
             "regular_price" => {
                 product.regular_price = match field.text().await {
-                    Ok(value) => value.parse().expect("Failed to parse the string from regular_price to f32"),
+                    Ok(value) => value.parse().expect("Failed to parse the string \"regular_price\" to f32"),
                     Err(e) => {
-                        eprintln!("Error parsing product Regular Price: {}", e);
-                        return Html("An error occurred while parsing product Regular Price".to_string());
+                        eprintln!("Error parsing the product field \"regular_price\": {}", e);
+                        return Html("An error occurred while parsing the product field \"regular_price\"".to_string());
                     }
                 }
             },
@@ -222,21 +223,30 @@ pub async fn handle(
                         if value.is_empty() {
                             -1.00
                         } else {
-                            value.parse().expect("Failed to parse the string from sale_price to f32")
+                            value.parse().expect("Failed to parse the string \"sale_price\" to f32")
                         }
                     },
                     Err(e) => {
-                        eprintln!("Error parsing product Sale Price: {}", e);
-                        return Html("An error occurred while parsing product Sale Price".to_string());
+                        eprintln!("Error parsing the product field \"sale_price\": {}", e);
+                        return Html("An error occurred while parsing the product field \"sale_price\"".to_string());
                     }
                 }
             },
             "stock_quantity" => {
                 product.stock_quantity = match field.text().await {
-                    Ok(value) => value.parse().expect("Failed to parse the string to i32"),
+                    Ok(value) => value.parse().expect("Failed to parse the string \"stock_quantity\" to u32"),
                     Err(e) => {
-                        eprintln!("Error parsing product Stock Quantity: {}", e);
-                        return Html("An error occurred while parsing product Stock Quantity".to_string());
+                        eprintln!("Error parsing the product field \"stock_quantity\": {}", e);
+                        return Html("An error occurred while parsing the product field \"stock_quantity\"".to_string());
+                    }
+                }
+            },
+            "weight" => {
+                product.weight = match field.text().await {
+                    Ok(value) => value.parse().expect("Failed to parse the string \"weight\" to u32"),
+                    Err(e) => {
+                        eprintln!("Error parsing the product field \"weight\": {}", e);
+                        return Html("An error occurred while parsing the product field \"weight\"".to_string());
                     }
                 }
             },
@@ -471,14 +481,15 @@ pub async fn handle(
         }
     }
 
+    product.price = product.regular_price;
     if sale_price < 0.00 {
         product.sale_price = 0.00;
         product.on_sale = false;
     } else if sale_price < product.regular_price {
         product.sale_price = sale_price;
         product.on_sale = true;
+        product.price = sale_price;
     }
-    product.price = product.sale_price;
 
     if product.slug.is_empty() {
         product.slug = slugify(&product.name);
@@ -524,7 +535,7 @@ pub async fn handle(
                 data.insert("categories", &categories);
                 data.insert("alert", "Product added");
                 data.insert("status", &status_names);
-                let rendered = tera.render("admin/admin.html", &data).unwrap();
+                let rendered = tera.render("backend/admin.html", &data).unwrap();
                 return Html(rendered);
             },
             Err(e) => {
@@ -545,7 +556,7 @@ pub async fn handle(
                 data.insert("categories", &categories);
                 data.insert("alert", "Product updated");
                 data.insert("status", &status_names);
-                let rendered = tera.render("admin/admin.html", &data).unwrap();
+                let rendered = tera.render("backend/admin.html", &data).unwrap();
                 return Html(rendered);
             },
             Err(e) => {
@@ -592,7 +603,7 @@ pub async fn edit(
             data.insert("product", &product);
             data.insert("categories", &categories);
             data.insert("status", &status_names);
-            let rendered = tera.render("admin/admin.html", &data).unwrap();
+            let rendered = tera.render("backend/admin.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {
@@ -622,6 +633,7 @@ pub async fn new(
         on_sale: false,
         stock_status: products::StockStatus::OutOfStock,
         stock_quantity: 0,
+        weight: 0,
         permalink: "".to_string(),
         status: products::Status::Draft,
         primary_category: 0,
@@ -650,7 +662,7 @@ pub async fn new(
     data.insert("product", &product);
     data.insert("categories", &categories);
     data.insert("status", &status_names);
-    let rendered = tera.render("admin/admin.html", &data).unwrap();
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)
 }
 
@@ -693,7 +705,7 @@ pub async fn list(
             data.insert("total_products", &total_count);
             data.insert("per_page", &per_page);
             data.insert("total_pages", &total_pages);
-            let rendered = tera.render("admin/admin.html", &data).unwrap();
+            let rendered = tera.render("backend/admin.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {

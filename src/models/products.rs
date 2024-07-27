@@ -1,5 +1,5 @@
 //
-// Last Modifications: 2024-07-22 22:30:33
+// Last Modifications: 2024-07-27 18:21:53
 //
 
 use crate::types;
@@ -136,7 +136,7 @@ pub struct ProductRowFrontend {
     on_sale: bool, // shows if the product is on sale (read-only)
     stock_status: StockStatus,
     stock_quantity: i32,
-    weight: i32,
+    weight: u32,
     gallery: Json<Vec<Media>>,
 }
 
@@ -155,7 +155,7 @@ pub struct ProductFrontend {
     on_sale: bool, // shows if the product is on sale (read-only)
     stock_quantity: i32,
     stock_status: StockStatus,
-    weight: i32,
+    weight: u32,
     // categories: Vec<Category>,
     gallery: Json<Vec<Media>>,
 }
@@ -260,7 +260,7 @@ impl<'a> Frontend<'a> {
                 on_sale: row.get::<bool, _>("on_sale"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
                 stock_status: row.get::<StockStatus, _>("stock_status"),
-                weight: row.get::<i32, _>("weight"),
+                weight: row.get::<i32, _>("weight") as u32,
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
             .fetch_all(self.pool)
@@ -357,7 +357,7 @@ impl<'a> Frontend<'a> {
                 on_sale: row.get::<bool, _>("on_sale"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
                 stock_status: row.get::<StockStatus, _>("stock_status"),
-                weight: row.get::<i32, _>("weight"),
+                weight: row.get::<i32, _>("weight") as u32,
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
             .fetch_all(self.pool)
@@ -405,7 +405,7 @@ impl<'a> Frontend<'a> {
                 on_sale: row.get::<bool, _>("on_sale"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
                 stock_status: row.get::<StockStatus, _>("stock_status"),
-                weight: row.get::<i32, _>("weight"),
+                weight: row.get::<i32, _>("weight") as u32,
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
             .fetch_one(self.pool)
@@ -470,7 +470,7 @@ impl<'a> Frontend<'a> {
                 on_sale: row.get::<bool, _>("on_sale"),
                 stock_quantity: row.get::<i32, _>("stock_quantity"),
                 stock_status: row.get::<StockStatus, _>("stock_status"),
-                weight: row.get::<i32, _>("weight"),
+                weight: row.get::<i32, _>("weight") as u32,
                 gallery: row.get::<Json<Vec<Media>>, _>("gallery"),
             })
             .fetch_all(self.pool)
@@ -580,6 +580,7 @@ pub struct ProductBackend {
     pub on_sale: bool, // shows if the product is on sale (read-only)
     pub stock_status: StockStatus,
     pub stock_quantity: i32,
+    pub weight: u32,
     pub status: Status,
     pub primary_category: i32,
     pub categories: Vec<i32>,
@@ -651,8 +652,8 @@ impl<'a> Backend<'a> {
             UPDATE products
             SET name = $1, slug = $2, description = $3, short_description = $4, sku = $5,
                 price = $6, regular_price = $7, sale_price = $8, on_sale = $9,
-                stock_quantity = $10, stock_status= $11, permalink = $12, status = $13, primary_category = $14
-            WHERE id = $15;
+                stock_quantity = $10, stock_status= $11, weight = $12, permalink = $13, status = $14, primary_category = $15
+            WHERE id = $16;
         "#)
             .bind(&product.name)
             .bind(&product.slug)
@@ -663,8 +664,9 @@ impl<'a> Backend<'a> {
             .bind(&product.regular_price)
             .bind(&product.sale_price)
             .bind(&product.on_sale)
-            .bind(&product.stock_quantity)
+            .bind(product.stock_quantity)
             .bind(&product.stock_status)
+            .bind(product.weight as i32)
             .bind(&product.permalink)
             .bind(&product.status)
             .bind(&product.primary_category)
@@ -846,7 +848,7 @@ impl<'a> Backend<'a> {
                 products.id, products.sku, products.name, products.slug,
                 products.description, products.short_description,
                 products.price, products.regular_price, products.sale_price, products.on_sale,
-                products.stock_quantity, products.stock_status, products.permalink,
+                products.stock_quantity, products.stock_status, products.weight, products.permalink,
                 products.date_created, products.status, products.primary_category,
                 COALESCE( (SELECT (JSON_AGG(ti)::jsonb)
                 FROM (
@@ -888,6 +890,7 @@ impl<'a> Backend<'a> {
             on_sale: row.get::<bool, _>("on_sale"),
             stock_status: row.get::<StockStatus, _>("stock_status"),
             stock_quantity: row.get::<i32, _>("stock_quantity"),
+            weight: row.get::<i32, _>("weight") as u32,
             status: row.get::<Status, _>("status"),
             permalink: row.get::<String, _>("permalink"),
             primary_category: row.get::<i32, _>("primary_category"),
@@ -903,8 +906,8 @@ impl<'a> Backend<'a> {
             INSERT INTO products (
                 name, slug, description, sku,
                 price, regular_price, sale_price, on_sale,
-                stock_quantity, stock_status, permalink, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id;
+                stock_quantity, stock_status, weight, permalink, status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id;
         "#)
            .bind(&product.name)
            .bind(&product.slug)
@@ -916,6 +919,7 @@ impl<'a> Backend<'a> {
            .bind(&product.on_sale)
            .bind(&product.stock_quantity)
            .bind(&product.stock_status)
+           .bind(product.weight as i32)
            .bind(&product.permalink)
            .bind(&product.status)
            .fetch_one(self.pool)

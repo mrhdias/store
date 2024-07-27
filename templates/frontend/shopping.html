@@ -8,14 +8,14 @@
 </head>
 <body>
 
-    {% include 'partials/header.html' %}
+    {% include 'frontend/partials/header.html' %}
 
     <main style="padding: 20px;">
     {% if cart | length > 0 %}
         {% if partial == "cart" %}
-            {% include 'partials/cart.html' %}
+            {% include 'frontend/partials/cart.html' %}
         {% elif partial == "checkout" %}
-            {% include 'partials/checkout.html' %}
+            {% include 'frontend/partials/checkout.html' %}
         {% endif %}
     {% else %}
         <h2>Your cart is currently empty.</h2>
@@ -26,6 +26,6 @@
     {% endif %}
     </main>
 
-    {% include 'partials/footer.html' %}
+    {% include 'frontend/partials/footer.html' %}
 </body>
 </html>

@@ -1,5 +1,5 @@
 //
-// Last Mofification: 2024-07-22 16:58:24
+// Last Mofification: 2024-07-27 18:35:21
 //
 
 use crate::types;
@@ -48,7 +48,7 @@ pub async fn list(
             data.insert("total_users", &total_count);
             data.insert("per_page", &per_page);
             data.insert("total_pages", &total_pages);
-            let rendered = tera.render("admin/admin.html", &data).unwrap();
+            let rendered = tera.render("backend/admin.html", &data).unwrap();
             Html(rendered)
         },
         Err(e) => {
