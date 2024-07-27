@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-24 20:58:51
+// Last Modification: 2024-07-26 19:37:54
 //
 
 use crate::models::users::UserRoles;
@@ -7,10 +7,12 @@ use crate::models::tokens;
 use anyhow::Result;
 
 use axum::{
-    extract::{Extension, FromRequestParts},
-    http::{request::Parts, StatusCode},
+    extract::{Extension, FromRequestParts, Query},
+    http::{request::Parts, HeaderMap, HeaderValue, StatusCode},
+    response::Html,
 };
 
+use tera::{Tera, Context};
 use std::collections::HashMap;
 
 pub struct RequireAuth {
@@ -80,4 +82,21 @@ where
         Err(StatusCode::UNAUTHORIZED)
 
     }
+}
+
+
+pub async fn login(
+    Query(parameters): Query<HashMap<String, String>>,
+    Extension(tera): Extension<Tera>) -> (HeaderMap, Html<String>) {
+
+    let mut headers = HeaderMap::new();
+    if parameters.contains_key("action") && parameters.get("action").unwrap() == "logout" {
+        headers
+            .insert(axum::http::header::SET_COOKIE, HeaderValue::from_str("token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT")
+            .unwrap());
+    }
+
+    let data = Context::new();
+    let rendered = tera.render("login.html", &data).unwrap();
+    return (headers, Html(rendered));
 }

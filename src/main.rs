@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-24 20:02:04
+// Last Modified: 2024-07-26 19:18:51
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -15,19 +15,21 @@
 // https://developer.mozilla.org/en-US/docs/Glossary/MVC
 //
 
+mod setup;
 mod models;
 mod controllers;
 mod types;
 mod utils;
 mod notifications;
 
-use anyhow;
-use std::collections::HashMap;
 use time::Duration;
-use std::process::exit;
+use std::path::{
+    Path,
+    PathBuf
+};
 
 use axum::{
-    extract::{Extension, Form, Query, Request},
+    extract::{Extension, Form, Request},
     http::{header::LOCATION, HeaderMap, HeaderValue, StatusCode},
     middleware::from_extractor,
     response::Html,
@@ -43,16 +45,23 @@ use tower_http::{
     normalize_path::NormalizePathLayer,
 };
 
-use tower_sessions::{Expiry, SessionManagerLayer};
+use tower_sessions::{
+    Expiry,
+    SessionManagerLayer
+};
 use tower_sessions_sqlx_store::PostgresStore;
 
-use tera::{Tera, Context};
+use tera::{
+    Tera,
+    Context
+};
 
 use sqlx::postgres::PgPoolOptions;
 
-use std::path::{Path, PathBuf};
-use ini::Ini;
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize,
+    Serialize
+};
 
 const APP_NAME: &str = "store";
 
@@ -120,110 +129,12 @@ async fn autentication(
     (StatusCode::OK, HeaderMap::new(), Html(rendered))
 }
 
-async fn login(
-    Query(parameters): Query<HashMap<String, String>>,
-    Extension(tera): Extension<Tera>) -> (HeaderMap, Html<String>) {
-
-    let mut headers = HeaderMap::new();
-    if parameters.contains_key("action") && parameters.get("action").unwrap() == "logout" {
-        headers.insert(axum::http::header::SET_COOKIE, HeaderValue::from_str("token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT").unwrap());
-    }
-
-    let data = Context::new();
-    let rendered = tera.render("login.html", &data).unwrap();
-    return (headers, Html(rendered));
-}
-
-async fn home(
-    Extension(tera): Extension<Tera>) -> Html<String> {
-
-    let data = Context::new();
-    let rendered = tera.render("home.html", &data).unwrap();
-    Html(rendered)
-}
-
-fn load_config(ini_file: &PathBuf) -> Result<DatabaseConf, anyhow::Error> {
-
-    let config = match Ini::load_from_file(&ini_file) {
-        Ok(config) => config,
-        Err(err) => {
-            return Err(anyhow::anyhow!("failed to parse config file: {}", err));
-        }
-    };
-
-    // localhost, store_admin, PreviewSem100, mystoredb
-
-    let db_settings = match config.section(Some("database")) {
-        Some(settings) => settings,
-        None => return Err(anyhow::anyhow!("database section not found in config file")),
-    };
-
-    let db_conf = DatabaseConf {
-        host: match db_settings.get("host") {
-            Some(value) => value.to_string(),
-            None => return Err(anyhow::anyhow!("invalid db host value")),
-        },
-        user: match db_settings.get("user") {
-            Some(value) => value.to_string(),
-            None => return Err(anyhow::anyhow!("invalid db uservalue")),
-        },
-        password: match db_settings.get("password") {
-            Some(value) => value.to_string(),
-            None => return Err(anyhow::anyhow!("invalid db password value")),
-        },
-        name: match db_settings.get("name") {
-            Some(value) => value.to_string(),
-            None => return Err(anyhow::anyhow!("invalid db name value")),
-        },
-        max_connections: match db_settings.get("max_connections") {
-            Some(value) => match value.parse() {
-                Ok(value) => value,
-                Err(err) => {
-                    return Err(anyhow::anyhow!("invalid max_connections: {}", err));
-                }
-            },
-            None => 5,
-        },
-    };
-
-    Ok(db_conf)
-}
-
-fn default_config_file(config_dir: &PathBuf) {
-
-    let mut conf = Ini::new();
-
-    conf.with_section(None::<String>)
-        .set("encoding", "utf-8");
-
-    conf.with_section(Some("database"))
-        .set("host", "localhost")
-        .set("user", "admin")
-        .set("password", "unknown")
-        .set("name", "unknown")
-        .set("max_connections", "5");
-
-    conf.write_to_file(config_dir.join(format!("{}.ini", APP_NAME))).unwrap();
-}
-
 #[tokio::main]
 async fn main() {
 
     let config_dir: PathBuf = Path::new(".").join("config");
-    if !config_dir.exists() {
-        std::fs::create_dir(&config_dir).expect("Failed to create config directory");
-    }
-    let ini_file = config_dir.join(format!("{}.ini", APP_NAME));
-
-    println!("Config Directory: {:?}", ini_file.display());
-
-    if !ini_file.exists() {
-        default_config_file(&config_dir);
-        println!("Take some time to check the configuration file: {}", ini_file.display());
-        exit(0);
-    }
-
-    let db_conf= match load_config(&ini_file) {
+    let config = setup::Config::new(APP_NAME, &config_dir);
+    let db_conf= match config.load() {
         Ok(conf) => conf,
         Err(e) => {
             panic!("Error loading database configuration: {}", e);
@@ -238,13 +149,13 @@ async fn main() {
             db_conf.host,
             db_conf.name))
         .await
-        .expect("Failed to make connection pool");
+        .expect("Failed to make connection pool! Please check if the PostgreSQL server is running and try again");
 
     // https://github.com/maxcountryman/tower-sessions
     // => \dt *.*
     let session_store = PostgresStore::new(pool.clone())
         // .with_schema_name("test_schema").unwrap()
-        .with_table_name("store_sessions").unwrap();
+        .with_table_name(format!("{}_sessions", APP_NAME)).unwrap();
 
     match session_store.migrate().await {
         Ok(()) => println!("Migration successful"),
@@ -276,9 +187,10 @@ async fn main() {
         .route("/admin/sidebar", get(controllers::admin::sidebar))
         .route("/admin", get(controllers::admin::dashboard))
         .route_layer(from_extractor::<controllers::auth::RequireAuth>())
-        .route("/", get(home))
+        .route("/", get(controllers::storefront::facade))
         .route("/test", get(|| async { "Hello, World!" }))
-        .route("/login", get(login).post(autentication))
+        .route("/login", get(controllers::auth::login)
+            .post(autentication))
         .route("/checkout", get(controllers::frontend::checkout::show)
             .post(controllers::frontend::checkout::place_order))
         .route("/cart/update", post(controllers::frontend::cart::update_cart))
@@ -297,9 +209,12 @@ async fn main() {
 
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
+        .await
+        .unwrap();
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
-        .await.unwrap();
+        .await
+        .unwrap();
 
 }
 

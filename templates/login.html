@@ -11,6 +11,7 @@ fieldset {
     width: 160px;
     margin: 0 auto;
     padding: 15px;
+    border: 1px solid #7a7a7a;
 }
 fieldset > #login {
     display: flex;
@@ -35,10 +36,16 @@ fieldset > #login {
                     <span class="alert">{{ alert }}</span>
                     {% endif %}
                     <label for="user">Username:</label>
-                    <input id="user" type="text" name="user" placeholder="user" value="demo@example.com" required>
+                    <input id="user" type="text"
+                        name="user" value="demo@example.com"
+                        placeholder="user" required>
                     <label for="password">Password:</label>
-                    <input id="password" type="password" name="password" placeholder="password" minlength="8" value="12345678" required>
-                    <input type="submit" name="submit" value="Log in" style="align-self: self-end;">
+                    <input id="password" type="password"
+                        name="password" value="12345678"
+                        placeholder="password" minlength="8" required>
+                    <input type="submit"
+                        name="submit" value="Log in"
+                        style="align-self: self-end;">
                 </form>
             </fieldset>
         </div>
