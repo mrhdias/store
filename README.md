@@ -1,6 +1,8 @@
 # store
 A sketch of an e-commerce store built with Rust, using PostgreSQL, [Axum](https://github.com/tokio-rs/axum), and the [Tera](https://keats.github.io/tera/) template engine.
 
+[![Rust](https://github.com/mrhdias/store/actions/workflows/rust.yml/badge.svg)](https://github.com/mrhdias/store/actions/workflows/rust.yml)
+
 If using ArchLinux, install [PostgreSQL](https://wiki.archlinux.org/title/PostgreSQL) by following these commands:
 ```
 sudo pacman -S postgresql
