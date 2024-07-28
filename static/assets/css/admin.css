@@ -20,6 +20,7 @@ main {
 }
 
 #workspace {
+    display: block;
     width: 100%;
     background-color: #f0f0f1;
     padding: 20px;
@@ -27,7 +28,9 @@ main {
 }
 
 #sidebar {
+    display: block;
     padding: 20px;
+    min-width: 90px;
 }
 
 #sidebar ul.menu {

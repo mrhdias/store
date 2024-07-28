@@ -177,6 +177,7 @@ async fn main() {
         // .route("/admin/products/:id/media/update", post(admin::products::media::update))
         // .route("/admin/products/:id/media/add", post(admin::products::media::add))
         // .route("/admin/products/:id/media", post(admin::products::media::select))
+        .route("/admin/categories", get(controllers::backend::categories::list))
         .route("/admin/products/:id", get(controllers::backend::products::edit)
             .post(controllers::backend::products::handle))
         .route("/admin/products/new", get(controllers::backend::products::new))

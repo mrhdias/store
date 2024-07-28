@@ -1,4 +1,5 @@
 //
+// Description: Manage product media.
 // Last Modification: 2024-07-27 18:36:44
 //
 
@@ -25,7 +26,8 @@ pub async fn library(
         .expect("Failed to fetch media list");
 
     let mut data = Context::new();
+    data.insert("partial", "media");
     data.insert("library", &rows);
-    let rendered = tera.render("backend/media.html", &data).unwrap();
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)
 }

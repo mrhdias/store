@@ -16,12 +16,16 @@
         <div id="workspace">
             {% if partial == "dashboard" %}
                 {% include "backend/partials/dashboard.html" %}
-            {% elif partial == "users" %}
-                {% include "backend/partials/users.html" %}
+            {% elif partial == "media" %}
+                {% include "backend/partials/media.html" %}
             {% elif partial == "products" %}
                 {% include "backend/partials/products.html" %}
             {% elif partial == "product" %}
                 {% include "backend/partials/product.html" %}
+            {% elif partial == "categories" %}
+                {% include "backend/partials/categories.html" %}
+            {% elif partial == "users" %}
+                {% include "backend/partials/users.html" %}
             {% endif %}
         </div>
     </main>
