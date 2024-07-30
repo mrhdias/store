@@ -5,5 +5,6 @@
 
 pub mod categories;
 pub mod media;
+pub mod orders;
 pub mod products;
 pub mod users;

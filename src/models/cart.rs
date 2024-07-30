@@ -1,8 +1,8 @@
 //
-// Last Modification: 2024-07-27 17:50:15
+// Last Modification: 2024-07-30 19:16:25
 //
 
-use anyhow::{self, Ok};
+use anyhow;
 use std::collections::HashMap;
 use num_traits::ToPrimitive;
 use serde::{Serialize, Deserialize};
@@ -25,10 +25,11 @@ struct Media {
 
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct Product {
-    id: i32,
-    name: String,
-    price: f32,
-    quantity: i32,
+    pub id: i32,
+    pub name: String,
+    pub sku: String,
+    pub price: f32,
+    pub quantity: i32,
     weight: u32,
     permalink: String,
     image: Json<Media>,
@@ -48,6 +49,12 @@ pub struct Cart<'a> {
 }
 
 impl<'a> Cart<'a> {
+
+    pub fn reset(&mut self) {
+        self.cart.clear();
+        self.total_weight = 0;
+        self.total_order = 0.0;
+    }
 
     pub fn add(&mut self, product_to_cart: &ProductToCart) {
         if self.cart.contains_key(&product_to_cart.product_id) {
@@ -94,7 +101,7 @@ impl<'a> Cart<'a> {
 
         let products = sqlx::query(r#"
             SELECT
-                products.id, products.name, products.permalink, products.price,
+                products.id, products.name, products.sku, products.permalink, products.price,
                 products.stock_quantity, products.weight, products.stock_status, (
                 SELECT json_build_object(
                     'id', media.id,
@@ -115,6 +122,7 @@ impl<'a> Cart<'a> {
                 let product = Product {
                     id: row.get::<i32, _>("id"),
                     name: row.get::<String, _>("name"),
+                    sku: row.get::<String, _>("sku"),
                     price: match row.get::<Decimal, _>("price").to_f32() {
                         Some(f) => f,
                         None => 0.00,

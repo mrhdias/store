@@ -103,15 +103,15 @@
 
             <div class="box">
                 <h3 class="title">Price:</h3>
-                <form oninput="result.value='$' + minimum_price.value">
+                <form oninput="result.value=minimum_price.value + ' €'">
                     <label for="minimum-price">Minimum</label>
                     <input type="range" id="minimum-price" name="minimum_price" min="0.00" max="100.00" value="0.00" step="1.00" />
-                    <output name="result" for="minimum-price">$0</output>
+                    <output name="result" for="minimum-price">0 €</output>
                 </form>
-                <form oninput="result.value='$' + maximum_price.value">
+                <form oninput="result.value=maximum_price.value + ' €'">
                     <label for="maximum-price">Maximum</label>
                     <input type="range" id="maximum-price" name="maximum_price" min="0.00" max="100.00" value="50.00" step="1.00" />
-                    <output name="result" for="maximum-price">$50</output>
+                    <output name="result" for="maximum-price">50 €</output>
                 </form>
             </div>
 
@@ -161,9 +161,9 @@
                     <p>{{ product.short_description }}</p>
                     <p>
                         {% if product.on_sale %}
-                            <span class="sales_price">${{ product.regular_price | round_and_format(places=2) }}</span>
+                            <span class="sales_price">{{ product.regular_price | round_and_format(places=2) }} €</span>
                         {% endif %}
-                        <span class="regular_price">${{ product.price | round_and_format(places=2) }}</span>
+                        <span class="regular_price">{{ product.price | round_and_format(places=2) }} €</span>
                     </p>
                     <form action="/cart/add" method="post">
                         <input type="hidden" name="product_id" value="{{ product.id }}">

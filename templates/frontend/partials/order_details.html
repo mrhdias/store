@@ -1,0 +1,59 @@
+<section>
+    <h2>Order Details</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line_item in order.line_items %}
+            <tr>
+                <td>{{ line_item.name }} x {{ line_item.quantity }}</td>
+                <td>{{ line_item.total | round_and_format(places=2) }} €</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td>Subtotal:</td>
+                <td>0.00 €</td>
+            </tr>
+            <tr>
+                <td>Payment method:</td>
+                <td>Direct bank transfer</td>
+            </tr>
+            <tr>
+                <td>Shipping:</td>
+                <td>0.00 €</td>
+            </tr>
+            <tr>
+                <td colspan="2">{{ order.total | round_and_format(places=2) }} €</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div>
+        <div class="billing">
+            <h3>Billing Data</h3>
+            <address>
+                {{ order.billing.first_name }} {{ order.billing.last_name }}<br>
+                {{ order.billing.address }}<br>
+                {{ order.billing.postcode }} {{ order.billing.city }}<br>
+                {{ order.billing.country_code }}
+            </address>
+        </div>
+        <div class="shipping">
+            <h3>Shipping Address</h3>
+            <address>
+                {{ order.shipping.first_name }} {{ order.shipping.last_name }}<br>
+                {{ order.shipping.address }}<br>
+                {{ order.shipping.postcode }} {{ order.shipping.city }}<br>
+                {{ order.shipping.country_code }}
+            </address>
+        </div>
+    </div>
+
+</section>

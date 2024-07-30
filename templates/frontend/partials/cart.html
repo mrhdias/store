@@ -49,20 +49,20 @@ th, td {
             </tr>
             <tr>
                 <td style="text-align: right;">
-                    <span>${{ product.price | round_and_format(places=2) }}</span>
+                    <span>{{ product.price | round_and_format(places=2) }} €</span>
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                         <path fill="black" d="M6.4 19L5 17.6l5.6-5.6L5 6.4L6.4 5l5.6 5.6L17.6 5L19 6.4L13.4 12l5.6 5.6l-1.4 1.4l-5.6-5.6z"/>
                     </svg>
                     <input type="number" name="quantity" value="{{ product.quantity }}" step="1" min="1" style="width: 50px;">
                 </td>
-                <td style="text-align: right;"><span>${{ subtotal | round_and_format(places=2) }}</span></td>
+                <td style="text-align: right;"><span>{{ subtotal | round_and_format(places=2) }} €</span></td>
             </tr>
             {% set_global total = total + subtotal %}
             {% endfor %}
 
             <tr>
                 <td colspan="3" style="text-align: right;">Cart Total:</td>
-                <td style="text-align: right;">${{ total | round_and_format(places=2) }}</td>
+                <td style="text-align: right;">{{ total | round_and_format(places=2) }} €</td>
             </tr>
 
         </tbody>

@@ -1,4 +1,13 @@
 <style>
+.pagination {
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
+    flex-direction: row;
+    align-items: center;
+    padding-bottom: 10px;
+}
+
 table.admin.product-list {
     table-layout: fixed;
     width: 100%;
@@ -60,15 +69,6 @@ table.admin.product-list {
 .admin.product-list .stock.backorder {
     color: gray;
 }
-
-.pagination {
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
-    flex-direction: row;
-    align-items: center;
-    padding-bottom: 10px;
-}
 </style>
 
 <a href="/admin/products/new" style="display: inline-block;text-decoration: none; padding: 4px 6px; border: 1px solid #c3c4c7;margin-bottom: 4px;">Add New</a>
@@ -126,9 +126,9 @@ table.admin.product-list {
                 ({{ product.stock_quantity }})
             </td>
             <td style="display: flex; flex-direction: column;">
-                <span {% if product.on_sale %}style="text-decoration:line-through;font-size:0.95em;"{% endif %}>${{ product.regular_price | round_and_format(places=2) }}</span>
+                <span {% if product.on_sale %}style="text-decoration:line-through;font-size:0.95em;"{% endif %}>{{ product.regular_price | round_and_format(places=2) }} €</span>
                 {% if product.on_sale %}
-                    <span>${{ product.sale_price | round_and_format(places=2) }}<span>
+                    <span>{{ product.sale_price | round_and_format(places=2) }} €<span>
                 {% endif %}
             </td>
             <td>{{ product.status | capitalize }}<br />{{ product.date_created }}</td>

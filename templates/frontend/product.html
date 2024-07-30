@@ -21,9 +21,9 @@
             <h1>{{ product.name }}</h1>
             <p>
                 {% if product.on_sale %}
-                    <span class="sales_price">${{ product.regular_price | round_and_format(places=2) }}</span>
+                    <span class="sales_price">{{ product.regular_price | round_and_format(places=2) }} €</span>
                 {% endif %}
-                <span class="regular_price">${{ product.price | round_and_format(places=2) }}</span>
+                <span class="regular_price">{{ product.price | round_and_format(places=2) }} €</span>
             </p>
             <form action="/cart/add" method="post">
                 <input type="hidden" name="product_id" value="{{ product.id }}">

@@ -16,6 +16,8 @@
             {% include 'frontend/partials/cart.html' %}
         {% elif partial == "checkout" %}
             {% include 'frontend/partials/checkout.html' %}
+        {% elif partial == "order_details" %}
+            {% include 'frontend/partials/order_details.html' %}
         {% endif %}
     {% else %}
         <h2>Your cart is currently empty.</h2>

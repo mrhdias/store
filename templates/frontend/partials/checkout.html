@@ -204,7 +204,7 @@ table th:last-child, table td:last-child {
                 {% set subtotal = product.price * product.quantity %}
                 <tr>
                     <td>{{ product.name }} x {{ product.quantity }}</td>
-                    <td>${{ subtotal | round_and_format(places=2) }}</td>
+                    <td>{{ subtotal | round_and_format(places=2) }} €</td>
                 </tr>
                 {% set_global total = total + subtotal %}
                 {% endfor %}
@@ -212,7 +212,7 @@ table th:last-child, table td:last-child {
             <tfoot>
                 <tr>
                     <td style="font-weight: bold;">Subtotal</td>
-                    <td>${{ total | round_and_format(places=2) }}</td>
+                    <td>{{ total | round_and_format(places=2) }} €</td>
                 </tr>
                 <tr>
                     <td>Shipping <button type="submit" name="calculate_shipping" value="true">{% if shipping_total >= 0 %}
@@ -221,14 +221,14 @@ table th:last-child, table td:last-child {
                         Calculate
                     {% endif %}</button></td>
                     <td>{% if shipping_total >= 0 %}
-                        ${{ shipping_total | round_and_format(places=2) }}
+                        {{ shipping_total | round_and_format(places=2) }} €
                     {% else %}
                         Enter shipping address
                     {% endif %}</td>
                 </tr>
                 <tr>
                     <td style="border: none; font-weight: bold;">Total</td>
-                    <td style="border: none;">${{ total | round_and_format(places=2) }}</td>
+                    <td style="border: none;">{{ total | round_and_format(places=2) }} €</td>
                 </tr>
             </tfoot>
         </table>
@@ -246,6 +246,6 @@ table th:last-child, table td:last-child {
             <label for="terms">I have read and agree to <a href="#">terms and conditions</a><sup>*</sup></label>
         </p>
 
-        <button type="submit">Place Order</button>
+        <button type="submit" {% if shipping_total < 0 %}disabled{% endif %}>Place Order</button>
     </section>
 </form>

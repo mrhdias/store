@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS media;
 DROP TABLE IF EXISTS product_categories;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS orders;
 
 DROP TYPE type;
 DROP TYPE status;
@@ -126,14 +127,6 @@ CREATE TABLE dimentions (
 );
 
 /*
-CREATE TABLE customers (
-    id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    billing_id INT REFERENCES billing(id),
-    shipping_id INT REFERENCES shipping(id),
-    is_paying_customer BOOLEAN DEFAULT FALSE,
-);
-
 CREATE TABLE billing (
     id SERIAL PRIMARY KEY,
     first_name VARCHAR(255) NOT NULL,
@@ -146,7 +139,9 @@ CREATE TABLE billing (
     country	iso_contry_code NOT NULL,
     email VARCHAR(255) NOT NULL,
     phone VARCHAR(255) DEFAULT '',
-    tax_id_number VARCHAR(255) DEFAULT ''
+    tax_id_number VARCHAR(255) DEFAULT '',
+    date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    date_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 );
 
 CREATE TABLE shipping (
@@ -158,32 +153,51 @@ CREATE TABLE shipping (
     city VARCHAR(255) NOT NULL,
     state VARCHAR(255) NOT NULL,
     postcode VARCHAR(255) NOT NULL,
-    country	iso_contry_code NOT NULL
-);
-
-CREATE TABLE orders (
-    id SERIAL PRIMARY KEY
+    country	iso_contry_code NOT NULL,
     date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     date_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    customer_id INT REFERENCES customers(id) ON DELETE CASCADE,
+);
+
+CREATE TABLE customers (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id),
+    billing_id INT REFERENCES billing(id),
+    shipping_id INT REFERENCES shipping(id),
+    is_paying_customer BOOLEAN DEFAULT FALSE,
+);
+
+CREATE TABLE customer_orders (
+    order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(order_id, user_id)
+);
+*/
+
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    order_key VARCHAR(255) NOT NULL,
+    date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    date_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     customer_ip_address VARCHAR(255) NOT NULL,
     customer_user_agent VARCHAR(255) NOT NULL,
-    customer_note VARCHAR(512) DEFAULT '',
-    billing_id INT REFERENCES billing(id) ON DELETE CASCADE,
-    shipping_id INT REFERENCES shipping(id) ON DELETE CASCADE,
+    customer_note TEXT DEFAULT '',
+    billing JSONB, -- JSONB field for storing billing
+    shipping JSONB, -- JSONB field for storing shipping address
+    line_items JSONB, -- JSONB field for storing line items
+    shipping_lines JSONB, -- JSONB field for storing shipping lines
     payment_method VARCHAR(255) NOT NULL, -- The payment gateway method used by the
     payment_method_title VARCHAR(255) NOT NULL,
     status order_status DEFAULT 'pending',
-    currency currency DEFAULT 'USD',
+    currency currency DEFAULT 'EUR',
     discount_total NUMERIC(10, 2) DEFAULT 0.00, -- Total discount amount for the order
     discount_tax NUMERIC(10, 2) DEFAULT 0.00, -- Total discount tax amount for the order
+    total NUMERIC(10, 2) DEFAULT 0.00, -- Total
     prices_include_tax BOOLEAN DEFAULT FALSE, -- True the prices included tax during checkout
     date_paid TIMESTAMP,
     date_completed TIMESTAMP,
     cart_hash VARCHAR(512) NOT NULL
+    -- UNIQUE(order_key, cart_hash)
 );
-*/
-
 
 INSERT INTO users (username, email, first_name, last_name, password, role, avatar_url) VALUES ('demo', 'demo@example.com', 'John', 'Doe', '12345678', 'admin', 'https://secure.gravatar.com/avatar/e1930bd4d635a8ed77450426e269eaa9?s=32&d=mm&r=g');
 

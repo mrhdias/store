@@ -172,6 +172,9 @@ async fn main() {
 
     // build our application with a single route
     let app = Router::new()
+        .route("/admin/orders/new", get(controllers::backend::orders::new))
+        .route("/admin/orders/:id", get(controllers::backend::orders::edit))
+        .route("/admin/orders", get(controllers::backend::orders::list))
         .route("/admin/media", get(controllers::backend::media::library))
         // admin products
         // .route("/admin/products/:id/media/update", post(admin::products::media::update))
