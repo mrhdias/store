@@ -1,5 +1,52 @@
+<style>
+table {
+    table-layout: fixed;
+    border-collapse: collapse;
+    border: 1px solid #c3c4c7;
+    margin: 0 auto;
+}
+
+table tr > td {
+    padding: 4px;
+}
+
+table tr > td:last-child {
+    text-align: right;
+}
+
+.addresses {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 40px;
+}
+</style>
 <section>
     <h2>Order Details</h2>
+
+    <ul>
+        <li>
+            <span>Order Number:</span>
+            <span>#{{ number }}</span>
+        </li>
+        <li>
+            <span>Date:</span>
+            <span>2024-07-31</span>
+        </li>
+        <li>
+            <span>Email:</span>
+            <span>{{ order.billing.email }}</span>
+        </li>
+        <li>
+            <span>Total:</span>
+            <span>{{ order.total | round_and_format(places=2) }} €</span>
+        </li>
+        <li>
+            <span>Payment Method:</span>
+            <span>{{ order.payment_method_title }}</span>
+        </li>
+    </ul>
 
     <table>
         <thead>
@@ -9,33 +56,35 @@
             </tr>
         </thead>
         <tbody>
+            {% set_global order_subtotal = 0.00 %}
             {% for line_item in order.line_items %}
             <tr>
                 <td>{{ line_item.name }} x {{ line_item.quantity }}</td>
                 <td>{{ line_item.total | round_and_format(places=2) }} €</td>
+                {% set_global order_subtotal = order_subtotal + line_item.total %}
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
             <tr>
                 <td>Subtotal:</td>
-                <td>0.00 €</td>
+                <td>{{ order_subtotal | round_and_format(places=2) }} €</td>
             </tr>
             <tr>
                 <td>Payment method:</td>
-                <td>Direct bank transfer</td>
+                <td>{{ order.payment_method_title }}</td>
             </tr>
             <tr>
                 <td>Shipping:</td>
-                <td>0.00 €</td>
+                <td>{{ order.shipping_total | round_and_format(places=2) }} €</td>
             </tr>
             <tr>
-                <td colspan="2">{{ order.total | round_and_format(places=2) }} €</td>
+                <td colspan="2" style="text-align: right;">{{ order.total | round_and_format(places=2) }} €</td>
             </tr>
         </tfoot>
     </table>
 
-    <div>
+    <div class="addresses">
         <div class="billing">
             <h3>Billing Data</h3>
             <address>

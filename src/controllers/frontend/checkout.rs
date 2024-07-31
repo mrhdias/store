@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-30 18:41:46
+// Last Modified: 2024-07-31 19:10:08
 //
 
 use crate::models::cart;
@@ -74,6 +74,17 @@ struct Shipping {
 struct Country {
     code: String,
     name: String,
+}
+
+fn calc_tax_value(
+    price: f32,
+    tax_rate: f32,
+    price_include_tax: bool) -> f32 {
+
+    if price_include_tax {
+        return price / (1.00 + tax_rate / 100.00)
+    }
+    price * tax_rate / 100.00
 }
 
 fn checkout_data(
@@ -192,7 +203,6 @@ pub async fn place_order(
                 Html(rendered)
 
             } else {
-
                 println!("Place order...");
 
                 let client_ip = headers
@@ -211,9 +221,11 @@ pub async fn place_order(
                     .and_then(|value| value.to_str().ok())
                     .unwrap_or("Unknown");
 
-                let mut total = 0.00;
+                let tax_rate = 23.00; // This is temporary, as soon as possible put in the database
+                let prices_include_tax = true; // This is temporary, as soon as possible put in the database
 
-                let order = orders::Order {
+                let mut order = orders::Order {
+                    order_key: "order_58d2d042d1d".to_string(),
                     customer_ip_address: client_ip.to_string(),
                     customer_user_agent: user_agent.to_string(),
                     billing: orders::Billing {
@@ -238,36 +250,77 @@ pub async fn place_order(
                         city: payload.shipping_city,
                         country_code: payload.shipping_country,
                     },
-                    line_items: || -> Vec<orders::LineItem> {
-                        let mut line_items = Vec::new();
-                        for product in products {
-                            line_items.push(orders::LineItem {
-                                product_id: product.id,
-                                sku: product.sku,
-                                name: product.name,
-                                price: product.price,
-                                quantity: product.quantity,
-                                subtotal: product.price * product.quantity as f32,
-                                total: product.price * product.quantity as f32,
-                            });
-                            total += product.price * product.quantity as f32;
-                        }
-                        line_items
-                    }(),
-                    shipping_items: || -> Vec<orders::ShippingLine> {
-                        let mut shipping_items = Vec::new();
-                        shipping_items.push(orders::ShippingLine {
-                            total: total_shipping,
-                        });
-                        shipping_items
-                    }(),
-                    total: total + total_shipping,
+                    line_items: vec![],
+                    shipping_items: vec![],
+                    payment_method: "bacs".to_string(),
+                    payment_method_title: "Direct Bank Transfer".to_string(),
+                    currency: orders::Currency::EUR,
+                    discount_total: 0.00,
+                    discount_tax: 0.00,
+                    shipping_total: 0.00,
+                    shipping_tax: 0.00,
+                    cart_tax: 0.00,
+                    total: 0.00,
+                    total_tax: 0.00,
+                    prices_include_tax,
                     customer_note: match payload.order_comments {
                         Some(value) => value,
                         None => "".to_string(),
                     },
                     status: orders::OrderStatus::Pending,
+                    cart_hash: "".to_string(),
                 };
+
+                order.line_items = || -> Vec<orders::LineItem> {
+                    let mut line_items = Vec::new();
+                    for product in products {
+
+                        let line_item = orders::LineItem {
+                            product_id: product.id,
+                            sku: product.sku,
+                            name: product.name,
+                            price: product.price,
+                            quantity: product.quantity,
+                            subtotal: product.regular_price * product.quantity as f32, // Line subtotal (before discounts)
+                            subtotal_tax: calc_tax_value(product.regular_price,
+                                tax_rate, prices_include_tax) * product.quantity as f32,
+                            total: product.price * product.quantity as f32, // Line total (after discounts).
+                            total_tax: calc_tax_value(product.price,
+                                tax_rate, prices_include_tax) * product.quantity as f32,
+                        };
+
+                        order.discount_total += (product.regular_price - product.price) * product.quantity as f32;
+                        order.discount_tax += calc_tax_value(product.regular_price - product.price,
+                            tax_rate, prices_include_tax) * product.quantity as f32;
+
+                        order.total += line_item.total;
+                        order.total_tax += line_item.total_tax;
+                        order.cart_tax += line_item.total_tax;
+
+                        line_items.push(line_item);
+
+                    }
+                    line_items
+                }();
+
+                order.shipping_items = || -> Vec<orders::ShippingLine> {
+                    let mut shipping_items = Vec::new();
+
+                    let shipping_item = orders::ShippingLine {
+                        total: total_shipping,
+                        total_tax: calc_tax_value(total_shipping,
+                            tax_rate, prices_include_tax),
+                    };
+
+                    order.shipping_total += shipping_item.total;
+                    order.total += shipping_item.total;
+                    order.total_tax += shipping_item.total_tax;
+
+                    shipping_items.push(shipping_item);
+
+                    shipping_items
+                }();
+
                 let order_manager = orders::Orders::new(pool.clone());
 
                 match order_manager.add(&order).await {
@@ -285,6 +338,7 @@ pub async fn place_order(
                         let mut data = Context::new();
                         data.insert("partial", "order_details");
                         data.insert("title", "Order Details");
+                        data.insert("number", &order_id);
                         data.insert("cart", "yes");
                         data.insert("order", &order);
                         let rendered = tera.render("frontend/shopping.html", &data).unwrap();

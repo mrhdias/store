@@ -191,7 +191,11 @@ CREATE TABLE orders (
     currency currency DEFAULT 'EUR',
     discount_total NUMERIC(10, 2) DEFAULT 0.00, -- Total discount amount for the order
     discount_tax NUMERIC(10, 2) DEFAULT 0.00, -- Total discount tax amount for the order
-    total NUMERIC(10, 2) DEFAULT 0.00, -- Total
+    shipping_total NUMERIC(10, 2) DEFAULT 0.00,
+    shipping_tax NUMERIC(10, 2) DEFAULT 0.00,
+    cart_tax NUMERIC(10, 2) DEFAULT 0.00, -- Sum of line item taxes only
+    total NUMERIC(10, 2) DEFAULT 0.00,
+    total_tax NUMERIC(10, 2) DEFAULT 0.00,
     prices_include_tax BOOLEAN DEFAULT FALSE, -- True the prices included tax during checkout
     date_paid TIMESTAMP,
     date_completed TIMESTAMP,

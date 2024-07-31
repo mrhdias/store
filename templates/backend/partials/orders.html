@@ -74,7 +74,7 @@ table.admin.order-list {
             <th>Order</th>
             <th>Date</th>
             <th>Customer</th>
-            <th>Total</th>
+            <th style="text-align: right;">Total</th>
             <th>Status</th>
         </thead>
         <tbody>
@@ -84,7 +84,7 @@ table.admin.order-list {
                 <td><a href="/admin/orders/{{ order.id }}">#{{ order.id }}</a></td>
                 <td>{{ order.date_created }}</td>
                 <td>{{ order.customer_name }}</td>
-                <td>{{ order.total | round_and_format(places=2) }} €</td>
+                <td style="text-align: right;">{{ order.total | round_and_format(places=2) }} €</td>
                 <td><span class="badge-{{ order.status | lower }}">{{ order.status | capitalize }}</span></td>
             </tr>
             {% endfor %}

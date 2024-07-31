@@ -20,6 +20,14 @@ use serde::{
 };
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "currency", rename_all = "UPPERCASE")]
+#[serde(rename_all = "UPPERCASE")]
+pub enum Currency {
+    EUR, // Default
+    USD,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "order_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum OrderStatus {
@@ -80,25 +88,40 @@ pub struct LineItem {
     pub price: f32,
     pub quantity: i32,
     pub subtotal: f32, // before discounts
+    pub subtotal_tax: f32, // before discounts
     pub total: f32, // after discounts
+    pub total_tax: f32, // after discounts
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShippingLine {
     pub total: f32,
+    pub total_tax: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Order {
+    pub order_key: String,
     pub customer_ip_address: String,
     pub customer_user_agent: String,
     pub billing: Billing,
     pub shipping: Shipping,
     pub line_items: Vec<LineItem>,
     pub shipping_items: Vec<ShippingLine>,
+    pub payment_method: String,
+    pub payment_method_title: String,
+    pub currency: Currency,
+    pub discount_total: f32,
+    pub discount_tax: f32,
+    pub shipping_total: f32,
+    pub shipping_tax: f32,
+    pub cart_tax: f32,
     pub total: f32,
+    pub total_tax: f32,
+    pub prices_include_tax: bool,
     pub customer_note: String,
     pub status: OrderStatus,
+    pub cart_hash: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -165,13 +188,22 @@ impl Orders {
         let order_id: i32 = sqlx::query(r#"
             INSERT INTO orders (
                 order_key, customer_ip_address, customer_user_agent, customer_note,
-                billing, shipping, line_items, shipping_lines, total,
-                payment_method, payment_method_title, cart_hash
+                billing, shipping, line_items, shipping_lines,
+                payment_method, payment_method_title, status, currency,
+                discount_total, discount_tax,
+                shipping_total, shipping_tax,
+                cart_tax,
+                total, total_tax,
+                prices_include_tax,
+                cart_hash
             )
             VALUES (
-                $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11, $12) RETURNING id;
+                $1, $2, $3, $4,
+                $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb,
+                $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+            ) RETURNING id;
         "#)
-            .bind("unknown")
+            .bind(&order.order_key)
             .bind(&order.customer_ip_address)
             .bind(&order.customer_user_agent)
             .bind(&order.customer_note)
@@ -179,10 +211,19 @@ impl Orders {
             .bind(shipping_json)
             .bind(line_items_json)
             .bind(shipping_items_json)
+            .bind(&order.payment_method)
+            .bind(&order.payment_method_title)
+            .bind(&order.status)
+            .bind(&order.currency)
+            .bind(&order.discount_total)
+            .bind(&order.discount_tax)
+            .bind(&order.shipping_total)
+            .bind(&order.shipping_tax)
+            .bind(&order.cart_tax)
             .bind(&order.total)
-            .bind("unknown")
-            .bind("unknown")
-            .bind("unknown")
+            .bind(&order.total_tax)
+            .bind(&order.prices_include_tax)
+            .bind(&order.cart_hash)
             .fetch_one(&self.pool)
             .await?
             .get(0);

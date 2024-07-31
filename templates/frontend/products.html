@@ -118,26 +118,29 @@
 
         </div>
         <div class="content">
-        {% if total_pages > 1 %}
-            {% set previous_page = current_page - 1 %}
-            {% if previous_page == 0 %}
-                {% set previous_page = 1 %}
-            {% endif %}
-            {% set next_page = current_page + 1 %}
-            {% if next_page > total_pages %}
-                {% set next_page = current_page %}
-            {% endif %}
-            <div class="pagination">
-                <span>{{ total_products }} items</span>
-                <a href="{{path}}?page=1">«</a>
-                <a href="{{path}}?page={{ previous_page }}">‹</a>
-                <form id="pagination" method="get" action="{{path}}">
-                    <input type="number" name="page" value="{{ current_page }}" min="1" max="2">
-                </form>
-                <span>of {{ total_pages }}</span>
-                <a href="{{path}}?page={{ next_page }}">›</a>
-                <a href="{{path}}?page={{ total_pages }}">»</a>
-            </div>
+        {% if products | length == 0  %}
+            <span style="width: 100%;">The product catalog is empty!</span>
+        {% else %}
+            {% if total_pages > 1 %}
+                {% set previous_page = current_page - 1 %}
+                {% if previous_page == 0 %}
+                    {% set previous_page = 1 %}
+                {% endif %}
+                {% set next_page = current_page + 1 %}
+                {% if next_page > total_pages %}
+                    {% set next_page = current_page %}
+                {% endif %}
+                <div class="pagination">
+                    <span>{{ total_products }} items</span>
+                    <a href="{{path}}?page=1">«</a>
+                    <a href="{{path}}?page={{ previous_page }}">‹</a>
+                    <form id="pagination" method="get" action="{{path}}">
+                        <input type="number" name="page" value="{{ current_page }}" min="1" max="2">
+                    </form>
+                    <span>of {{ total_pages }}</span>
+                    <a href="{{path}}?page={{ next_page }}">›</a>
+                    <a href="{{path}}?page={{ total_pages }}">»</a>
+                </div>
             {% endif %}
 
             <ul class="product-list">
@@ -146,7 +149,6 @@
                     <a href="{{ product.permalink }}">
                         <img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}">
                         {% set promotion = (1 - (product.price / product.regular_price)) * 100.0 %}
-                    
                         <div class="labels">
                             {% if product.stock_status == "outofstock" %}
                             <label class="outofstock">Out off stock</label>
@@ -173,6 +175,7 @@
                 </li>
                 {% endfor %}
             </ul>
+        {% endif %}
         </div>
     </main>
 

@@ -134,10 +134,6 @@ pub async fn list(
         }
     };
 
-    if total == 0 {
-        return Html("There are no products available".to_string());
-    }
-
     let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
 
     let mut page = pagination.page.unwrap_or(1) as i32;
@@ -147,37 +143,41 @@ pub async fn list(
         page = 1;
     }
 
-    match products_manager.frontend().get_all(
-        Some(products::Status::Publish),
-        page, 
-        per_page as i32,
-        pagination.order.unwrap_or(types::Order::Desc)).await {
-        Ok(products) => {
-
-            let categories = match products_manager.frontend().categories().await {
-                Ok(c) => c,
+    let products = if total > 0 {
+        match products_manager.frontend().get_all(
+            Some(products::Status::Publish),
+            page, 
+            per_page as i32,
+            pagination.order.unwrap_or(types::Order::Desc)).await {
+                Ok(products) => products,
                 Err(e) => {
                     eprintln!("Error: {}", e);
-                    return Html("An error occurred while fetching categories.".to_string());
+                    return Html("An error occurred while fetching products.".to_string());
                 }
-            };
+        }
+    } else {
+        vec![]
+    };
 
-            tera.register_filter("round_and_format", utils::round_and_format_filter);
-
-            let mut data = Context::new();
-            data.insert("path", "/products");
-            data.insert("categories", &categories);
-            data.insert("products", &products);
-            data.insert("current_page", &page);
-            data.insert("total_products", &total);
-            data.insert("per_page", &per_page);
-            data.insert("total_pages", &total_pages);
-            let rendered = tera.render("frontend/products.html", &data).unwrap();
-            Html(rendered)
-        },
+    let categories = match products_manager.frontend().categories().await {
+        Ok(categories) => categories,
         Err(e) => {
             eprintln!("Error: {}", e);
-            Html("An error occurred while fetching products.".to_string())
-        },
-    }
+            return Html("An error occurred while fetching categories.".to_string());
+        }
+    };
+
+    tera.register_filter("round_and_format", utils::round_and_format_filter);
+
+    let mut data = Context::new();
+    data.insert("path", "/products");
+    data.insert("categories", &categories);
+    data.insert("products", &products);
+    data.insert("current_page", &page);
+    data.insert("total_products", &total);
+    data.insert("per_page", &per_page);
+    data.insert("total_pages", &total_pages);
+
+    let rendered = tera.render("frontend/products.html", &data).unwrap();
+    Html(rendered)
 }

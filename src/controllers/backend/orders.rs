@@ -67,7 +67,7 @@ pub async fn list(
             Ok(orders) => orders,
             Err(e) => {
                 eprintln!("Error: {}", e);
-                return Html("An error occurred while fetching products.".to_string());
+                return Html("An error occurred while fetching orders.".to_string());
             },
         }
     } else {

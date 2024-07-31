@@ -690,27 +690,31 @@ pub async fn list(
         page = 1;
     }
 
-    match products_manager.backend().get_all(
-        page, 
-        per_page as i32,
-        pagination.order.unwrap_or(types::Order::Desc)).await {
-        Ok(products) => {
+    let products = if total_count > 0 {
+        match products_manager.backend().get_all(
+            page, 
+            per_page as i32,
+            pagination.order.unwrap_or(types::Order::Desc)).await {
+            Ok(products) => products,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Html("An error occurred while fetching products.".to_string());
+            },
+        }
+    } else {
+        vec![]
+    };
 
-            tera.register_filter("round_and_format", utils::round_and_format_filter);
+    tera.register_filter("round_and_format", utils::round_and_format_filter);
 
-            let mut data = Context::new();
-            data.insert("partial", "products");
-            data.insert("products", &products);
-            data.insert("current_page", &page);
-            data.insert("total_products", &total_count);
-            data.insert("per_page", &per_page);
-            data.insert("total_pages", &total_pages);
-            let rendered = tera.render("backend/admin.html", &data).unwrap();
-            Html(rendered)
-        },
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            Html("An error occurred while fetching products.".to_string())
-        },
-    }
+    let mut data = Context::new();
+    data.insert("partial", "products");
+    data.insert("products", &products);
+    data.insert("current_page", &page);
+    data.insert("total_products", &total_count);
+    data.insert("per_page", &per_page);
+    data.insert("total_pages", &total_pages);
+
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
+    Html(rendered)
 }

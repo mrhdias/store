@@ -29,6 +29,7 @@ pub struct Product {
     pub name: String,
     pub sku: String,
     pub price: f32,
+    pub regular_price: f32,
     pub quantity: i32,
     weight: u32,
     permalink: String,
@@ -101,7 +102,7 @@ impl<'a> Cart<'a> {
 
         let products = sqlx::query(r#"
             SELECT
-                products.id, products.name, products.sku, products.permalink, products.price,
+                products.id, products.name, products.sku, products.permalink, products.price, products.regular_price,
                 products.stock_quantity, products.weight, products.stock_status, (
                 SELECT json_build_object(
                     'id', media.id,
@@ -124,6 +125,10 @@ impl<'a> Cart<'a> {
                     name: row.get::<String, _>("name"),
                     sku: row.get::<String, _>("sku"),
                     price: match row.get::<Decimal, _>("price").to_f32() {
+                        Some(f) => f,
+                        None => 0.00,
+                    },
+                    regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
                         Some(f) => f,
                         None => 0.00,
                     },
