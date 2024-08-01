@@ -3,6 +3,8 @@
 //
 
 use crate::types;
+use crate::models::frontend;
+use crate::models::backend;
 
 use anyhow;
 use num_traits::ToPrimitive;
@@ -20,7 +22,6 @@ use strum::EnumIter;
 use sqlx::{
     postgres::PgRow,
     types::{Json, Decimal},
-    FromRow,
     Row,
 };
 
@@ -71,7 +72,7 @@ impl StockStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Media {
+pub struct Media {
     id: i32,
     src: String,
     name: String,
@@ -119,45 +120,6 @@ pub struct Category {
     has_childs: bool, // if has childs
     branches: i32, // number of branches in the tree
     product_count: i64, // number of products
-}
-
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct ProductRowFrontend {
-    id: i32,
-    sku: String,
-    name: String,
-    slug: String,
-    permalink: String,
-    description: String,
-    short_description: String,
-    price: f32, // current product price (read-only)
-    regular_price: f32, // product regular price
-    sale_price: f32, // product sale price
-    on_sale: bool, // shows if the product is on sale (read-only)
-    stock_status: StockStatus,
-    stock_quantity: i32,
-    weight: u32,
-    gallery: Json<Vec<Media>>,
-}
-
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct ProductFrontend {
-    id: i32,
-    sku: String,
-    name: String,
-    slug: String,
-    permalink: String,
-    description: String,
-    short_description: String,
-    price: f32, // current product price (read-only)
-    regular_price: f32, // product regular price
-    sale_price: f32, // product sale price
-    on_sale: bool, // shows if the product is on sale (read-only)
-    stock_quantity: i32,
-    stock_status: StockStatus,
-    weight: u32,
-    // categories: Vec<Category>,
-    gallery: Json<Vec<Media>>,
 }
 
 pub struct Products {
@@ -211,7 +173,7 @@ impl<'a> Frontend<'a> {
         slug: &str,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
 
@@ -237,7 +199,7 @@ impl<'a> Frontend<'a> {
             .bind(slug)
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRowFrontend {
+            .map(|row: PgRow| frontend::ProductShort {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -299,7 +261,7 @@ impl<'a> Frontend<'a> {
         skus: &Vec<String>,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let mut where_parts = Vec::new();
         where_parts.push("products.status = 'publish'".to_string());
@@ -334,7 +296,7 @@ impl<'a> Frontend<'a> {
         "#, where_parts.join(" AND "), order.as_str()))
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRowFrontend {
+            .map(|row: PgRow| frontend::ProductShort {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -366,7 +328,7 @@ impl<'a> Frontend<'a> {
         Ok(products)
     }
 
-    pub async fn get_one_by_slug(&self, slug: &str) -> Result<ProductFrontend, anyhow::Error> {
+    pub async fn get_one_by_slug(&self, slug: &str) -> Result<frontend::Product, anyhow::Error> {
 
         let product = sqlx::query(r#"
             SELECT
@@ -382,7 +344,7 @@ impl<'a> Frontend<'a> {
             WHERE products.slug = $1 AND products.status = 'publish';
         "#)
             .bind(slug)
-            .map(|row: PgRow| ProductFrontend {
+            .map(|row: PgRow| frontend::Product {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -418,7 +380,7 @@ impl<'a> Frontend<'a> {
         status: Option<Status>,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRowFrontend>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
 
@@ -447,7 +409,7 @@ impl<'a> Frontend<'a> {
         "#, from, order.as_str()))
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRowFrontend {
+            .map(|row: PgRow| frontend::ProductShort {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -549,44 +511,6 @@ impl ProductImage {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProductRowBackend {
-    id: i32,
-    sku: String,
-    name: String,
-    regular_price: f32, // product regular price
-    sale_price: f32, // product sale price
-    on_sale: bool, // shows if the product is on sale (read-only)
-    stock_status: StockStatus,
-    stock_quantity: i32,
-    image_src: String,
-    image_alt: String,
-    date_created: String,
-    status: Status,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProductBackend {
-    pub id: i32,
-    pub sku: String,
-    pub name: String,
-    pub slug: String,
-    pub permalink: String,
-    pub description: String,
-    pub short_description: String,
-    pub price: f32, // current product price (read-only)
-    pub regular_price: f32, // product regular price
-    pub sale_price: f32, // product sale price
-    pub on_sale: bool, // shows if the product is on sale (read-only)
-    pub stock_status: StockStatus,
-    pub stock_quantity: i32,
-    pub weight: u32,
-    pub status: Status,
-    pub primary_category: i32,
-    pub categories: Vec<i32>,
-    pub images: Vec<ProductImage>
-}
-
 pub struct Backend<'a> {
     pool: &'a sqlx::Pool<sqlx::Postgres>,
 }
@@ -643,7 +567,7 @@ impl<'a> Backend<'a> {
     }
 
     pub async fn update(&self,
-        product: &ProductBackend,
+        product: &backend::Product,
         images: &HashMap<i32, ImageOperation>,
         delete_media: bool) -> Result<(), anyhow::Error> {
         // Implementation to update a product
@@ -782,7 +706,7 @@ impl<'a> Backend<'a> {
     pub async fn get_all(&self,
         page: i32,
         per_page: i32,
-        order: types::Order) -> Result<Vec<ProductRowBackend>, anyhow::Error> {
+        order: types::Order) -> Result<Vec<backend::ProductShort>, anyhow::Error> {
         // Implementation to get products
 
         let offset = (page - 1) * per_page;
@@ -811,7 +735,7 @@ impl<'a> Backend<'a> {
         "#, order.as_str()))
             .bind(per_page)
             .bind(offset)
-            .map(|row: PgRow| ProductRowBackend {
+            .map(|row: PgRow| backend::ProductShort {
                 id: row.get::<i32, _>("id"),
                 sku: row.get::<String, _>("sku"),
                 name: row.get::<String, _>("name"),
@@ -840,7 +764,7 @@ impl<'a> Backend<'a> {
         Ok(products)
     }
 
-    pub async fn get(&self, product_id: i32) -> Result<ProductBackend, anyhow::Error> {
+    pub async fn get(&self, product_id: i32) -> Result<backend::Product, anyhow::Error> {
         // Implementation to get a product by ID
 
         let row = sqlx::query(r#"
@@ -868,7 +792,7 @@ impl<'a> Backend<'a> {
         let images_json: JsonValue = row.get("images");
         let categories_json: JsonValue = row.get("categories");
 
-        Ok(ProductBackend {
+        Ok(backend::Product {
             id: row.get::<i32, _>("id"),
             sku: row.get::<String, _>("sku"),
             name: row.get::<String, _>("name"),
@@ -899,7 +823,7 @@ impl<'a> Backend<'a> {
         })
     }
 
-    pub async fn add(&self, product: &ProductBackend) -> Result<i32, anyhow::Error> {
+    pub async fn add(&self, product: &backend::Product) -> Result<i32, anyhow::Error> {
         // Implementation to add a new product
 
         let product_id: i32 = sqlx::query(r#"

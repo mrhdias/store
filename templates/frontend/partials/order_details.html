@@ -81,6 +81,12 @@ table tr > td:last-child {
             <tr>
                 <td colspan="2" style="text-align: right;">{{ order.total | round_and_format(places=2) }} €</td>
             </tr>
+            {% if order.customer_note != "" %}
+            <tr>
+                <td>Note:</td>
+                <td>{{ order.customer_note }} €</td>
+            </tr>
+            {% endif %}
         </tfoot>
     </table>
 
@@ -91,7 +97,9 @@ table tr > td:last-child {
                 {{ order.billing.first_name }} {{ order.billing.last_name }}<br>
                 {{ order.billing.address }}<br>
                 {{ order.billing.postcode }} {{ order.billing.city }}<br>
-                {{ order.billing.country_code }}
+                {{ order.billing.country_code }}<br>
+                {{ order.billing.email }}<br>
+                {{ order.billing.phone }}
             </address>
         </div>
         <div class="shipping">

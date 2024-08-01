@@ -1,7 +1,8 @@
 //
-// Last Modification: 2024-07-27 19:20:48
+// Last Modification: 2024-08-01 18:53:18
 //
 
+use crate::models;
 use crate::types;
 use crate::utils;
 use crate::models::categories;
@@ -115,7 +116,7 @@ pub async fn handle(
     let mut categories_ids: Vec<i32> = vec![];
     let mut primary_category = 0;
 
-    let mut product = products::ProductBackend {
+    let mut product = models::backend::Product {
         id,
         sku: "".to_string(),
         name: "".to_string(),
@@ -620,7 +621,7 @@ pub async fn new(
 
     // let categories = vec![];
 
-    let product = products::ProductBackend {
+    let product = models::backend::Product {
         id: 0,
         sku: "".to_string(),
         name: "".to_string(),

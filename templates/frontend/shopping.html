@@ -11,20 +11,22 @@
     {% include 'frontend/partials/header.html' %}
 
     <main style="padding: 20px;">
-    {% if cart | length > 0 %}
-        {% if partial == "cart" %}
-            {% include 'frontend/partials/cart.html' %}
-        {% elif partial == "checkout" %}
-            {% include 'frontend/partials/checkout.html' %}
-        {% elif partial == "order_details" %}
-            {% include 'frontend/partials/order_details.html' %}
-        {% endif %}
+    {% if partial == "order_details" %}
+        {% include 'frontend/partials/order_details.html' %}
     {% else %}
-        <h2>Your cart is currently empty.</h2>
-        <p>
-            Before proceed to checkout you must add some products to your shopping cart.<br />
-            You will find a lot of interesting products on our "Shop" page.
-        </p>
+        {% if cart | length > 0 %}
+            {% if partial == "cart" %}
+                {% include 'frontend/partials/cart.html' %}
+            {% elif partial == "checkout" %}
+                {% include 'frontend/partials/checkout.html' %}
+            {% endif %}
+        {% else %}
+            <h2>Your cart is currently empty.</h2>
+            <p>
+                Before proceed to checkout you must add some products to your shopping cart.<br />
+                You will find a lot of interesting products on our "Shop" page.
+            </p>
+        {% endif %}
     {% endif %}
     </main>
 

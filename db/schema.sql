@@ -27,7 +27,7 @@ CREATE TYPE status AS ENUM ('draft', 'pending', 'private', 'publish');
 CREATE TYPE stock_status AS ENUM ('instock', 'outofstock', 'onbackorder');
 CREATE TYPE catalog_visibility AS ENUM ('visible', 'catalog', 'search', 'hidden');
 CREATE TYPE user_roles AS ENUM ('admin', 'customer', 'guest');
-CREATE TYPE order_status AS ENUM ('pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed', 'trash');
+CREATE TYPE order_status AS ENUM ('pending', 'processing', 'onhold', 'completed', 'cancelled', 'refunded', 'failed', 'trash');
 CREATE TYPE currency AS ENUM ('EUR', 'USD');
 CREATE TYPE iso_contry_code AS ENUM ('FR', 'ES', 'PT', 'US');
 

@@ -1,5 +1,6 @@
 //
-// Last Modification: 2024-07-30 19:16:25
+// Description: Shopping cart management
+// Last Modification: 2024-08-01 16:47:46
 //
 
 use anyhow;
@@ -44,26 +45,30 @@ pub struct ProductToCart {
 
 pub struct Cart<'a> {
     pool: sqlx::Pool<sqlx::Postgres>,
-    cart: &'a mut HashMap<i32, i32>,
+    purchases: &'a mut HashMap<i32, i32>,
     pub total_weight: u32,
     pub total_order: f32,
 }
 
 impl<'a> Cart<'a> {
 
+    pub fn is_empty(&self) -> bool {
+        self.purchases.is_empty()
+    }
+
     pub fn reset(&mut self) {
-        self.cart.clear();
+        self.purchases.clear();
         self.total_weight = 0;
         self.total_order = 0.0;
     }
 
     pub fn add(&mut self, product_to_cart: &ProductToCart) {
-        if self.cart.contains_key(&product_to_cart.product_id) {
-            if let Some(value) = self.cart.get_mut(&product_to_cart.product_id) {
+        if self.purchases.contains_key(&product_to_cart.product_id) {
+            if let Some(value) = self.purchases.get_mut(&product_to_cart.product_id) {
                 *value += product_to_cart.product_quantity;
             }
         } else {
-            self.cart.insert(product_to_cart.product_id, product_to_cart.product_quantity);
+            self.purchases.insert(product_to_cart.product_id, product_to_cart.product_quantity);
         }
     }
 
@@ -78,15 +83,15 @@ impl<'a> Cart<'a> {
                 match k {
                     "id" => {
                         current_key = v.parse::<i32>().unwrap();
-                        self.cart.insert(current_key, 0);
+                        self.purchases.insert(current_key, 0);
                     },
                     "quantity" => {
-                        if let Some(value) = self.cart.get_mut(&current_key) {
+                        if let Some(value) = self.purchases.get_mut(&current_key) {
                             *value += &v.parse::<i32>().unwrap();
                         }
                     },
                     "remove" => {
-                        self.cart.remove(&current_key);
+                        self.purchases.remove(&current_key);
                     },
                     _ => {
                         eprintln!("Invalid cart key: {:?}", current_key);
@@ -98,7 +103,7 @@ impl<'a> Cart<'a> {
 
 
     pub async fn get(&mut self) -> Result<Vec<Product>, anyhow::Error> {
-        let product_ids: Vec<i32> = self.cart.keys().cloned().collect();
+        let product_ids: Vec<i32> = self.purchases.keys().cloned().collect();
 
         let products = sqlx::query(r#"
             SELECT
@@ -132,14 +137,14 @@ impl<'a> Cart<'a> {
                         Some(f) => f,
                         None => 0.00,
                     },
-                    quantity: match self.cart.get(&row.get::<i32, _>("id")) {
+                    quantity: match self.purchases.get(&row.get::<i32, _>("id")) {
                         Some(q) => {
                             let id = &row.get::<i32, _>("id");
                             let stock_quantity = row.get::<i32, _>("stock_quantity");
                             
                             let mut quantity = *q;
                             if stock_quantity == 0 {
-                                self.cart.remove(id);
+                                self.purchases.remove(id);
                                 quantity = 0;
                             } else if *q > stock_quantity {
                                 quantity = stock_quantity;
@@ -169,11 +174,11 @@ impl<'a> Cart<'a> {
 
     pub fn new(
         pool: sqlx::Pool<sqlx::Postgres>,
-        cart: &'a mut HashMap<i32, i32>) -> Self {
+        purchases: &'a mut HashMap<i32, i32>) -> Self {
 
         Cart {
             pool,
-            cart,
+            purchases,
             total_weight: 0,
             total_order: 0.00,
         }

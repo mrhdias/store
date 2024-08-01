@@ -33,10 +33,18 @@ table.admin.order-list {
     vertical-align: top;
 }
 
-.badge-pending {
-    background-color: #ffab91;
+.badge-status {
+    background-color: #e0e0e0;
     padding: 2px 6px;
     border-radius: 5px;
+}
+
+.badge-pending {
+    background-color: #ffab91;
+}
+
+.badge-on-hold {
+    background-color: #ffe082;
 }
 
 </style>
@@ -85,7 +93,7 @@ table.admin.order-list {
                 <td>{{ order.date_created }}</td>
                 <td>{{ order.customer_name }}</td>
                 <td style="text-align: right;">{{ order.total | round_and_format(places=2) }} €</td>
-                <td><span class="badge-{{ order.status | lower }}">{{ order.status | capitalize }}</span></td>
+                <td><span class="badge-status badge-{{ order.status | lower }}">{{ order.status | capitalize }}</span></td>
             </tr>
             {% endfor %}
         </tbody>

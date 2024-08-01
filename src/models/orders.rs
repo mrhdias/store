@@ -1,10 +1,10 @@
 //
 // Description: Manage customer orders
-// Last Moficication: 2024-07-30 18:41:54
+// Last Moficication: 2024-08-01 22:15:47
 //
 
 use crate::types;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use num_traits::ToPrimitive;
 use anyhow;
 
@@ -129,7 +129,7 @@ pub struct OrderRow {
     id: i32,
     date_created: String,
     customer_name: String,
-    status: OrderStatus,
+    status: String,
     total: f32,
 }
 
@@ -162,10 +162,28 @@ impl Orders {
             .map(|row: PgRow| OrderRow {
                 id: row.get::<i32, _>("id"),
                 date_created: || -> String {
+
                     let date_created = row.get::<NaiveDateTime, _>("date_created");
-                    date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
+                    let date_created_utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(date_created, Utc);
+
+                    let now = Utc::now();
+                    let duration = now.signed_duration_since(date_created_utc);
+
+                    match duration {
+                        d if d.num_days() > 0 => date_created.format("%b %d, %Y").to_string(),
+                        d if d.num_hours() > 0 => format!("{} hours ago", d.num_hours()),
+                        d if d.num_minutes() > 0 => format!("{} minutes ago", d.num_minutes()),
+                        d if d.num_seconds() > 0 => format!("{} seconds ago", d.num_seconds()),
+                        _ => "Just now".to_string(),
+                    }
+
+                    // date_created.format("%b %d, %Y").to_string()
+                    // date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
                 }(),
-                status: row.get::<OrderStatus, _>("status"),
+                status: || -> String {
+                    let status = row.get::<OrderStatus, _>("status");
+                    status.as_str().to_string()
+                }(),
                 total: match row.get::<Decimal, _>("total").to_f32() {
                     Some(f) => f,
                     None => 0.00,

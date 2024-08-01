@@ -2,6 +2,9 @@
 // Last Modification: 2024-07-24 19:54:12
 //
 
+pub mod backend;
+pub mod frontend;
+
 pub mod cart;
 pub mod categories;
 pub mod media;

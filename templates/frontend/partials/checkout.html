@@ -61,7 +61,7 @@ table th:last-child, table td:last-child {
 <span class="alert">{{ alert }}</span>
 {% endif %}
 
-<form name="checkout" method="post" action="/checkout">
+<form id="checkout" name="checkout" method="post" action="/checkout">
     <section>
         <div class="billing">
             <h2>Billing Details</h2>
@@ -215,7 +215,9 @@ table th:last-child, table td:last-child {
                     <td>{{ total | round_and_format(places=2) }} €</td>
                 </tr>
                 <tr>
-                    <td>Shipping <button type="submit" name="calculate_shipping" value="true">{% if shipping_total >= 0 %}
+                    <td>Shipping <button id="calculate-shipping" type="submit"
+                        name="calculate_shipping"
+                        value="true">{% if shipping_total >= 0 %}
                         Recalculate
                     {% else %}
                         Calculate
@@ -246,6 +248,37 @@ table th:last-child, table td:last-child {
             <label for="terms">I have read and agree to <a href="#">terms and conditions</a><sup>*</sup></label>
         </p>
 
-        <button type="submit" {% if shipping_total < 0 %}disabled{% endif %}>Place Order</button>
+        <button id="place-order" type="submit" {% if shipping_total < 0 %}disabled{% endif %}>Place Order</button>
     </section>
 </form>
+
+<script>
+
+function populate_shipping() {
+    if (!document.getElementById('ship-to-different-address').checked) {
+        for (const field of ['first-name', 'last-name', 'address', 'postcode', 'city', 'country']) {
+	        document.getElementById('shipping-' + field).value = document.getElementById('billing-' + field).value;
+        }
+    }
+}
+
+document.getElementById('checkout').querySelector(".shipping").style.display = 'none';
+
+document.getElementById('ship-to-different-address').addEventListener('change', function() {
+    document.getElementById('checkout').querySelector(".shipping").style.display = this.checked? 'block' : 'none';
+    for (const field of ['first-name', 'last-name', 'address', 'postcode', 'city', 'country']) {
+	    document.getElementById('shipping-' + field).value = '';
+    }
+});
+
+document.getElementById('calculate-shipping').addEventListener('click', function() {
+    populate_shipping();
+    document.getElementById('terms').checked = true;
+});
+
+document.getElementById('place-order').addEventListener('click', function() {
+    populate_shipping();
+});
+
+
+</script>

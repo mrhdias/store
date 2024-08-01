@@ -1,5 +1,7 @@
 //
-// Last Modified: 2024-07-31 19:10:08
+// Last Modified: 2024-08-01 19:33:59
+// References:
+// https://woocommerce.com/document/managing-orders/order-statuses/
 //
 
 use crate::models::cart;
@@ -166,6 +168,19 @@ pub async fn place_order(
     };
 
     let mut cart = cart::Cart::new(pool.clone(), &mut current_cart);
+    if cart.is_empty() {
+
+        let products: Vec<Product> = vec![];
+
+        let mut data = Context::new();
+        data.insert("partial", "cart");
+        data.insert("title", "Cart - Empty Cart");
+        data.insert("cart", &products);
+        let rendered = tera.render("frontend/shopping.html", &data).unwrap();
+
+        return Html(rendered);
+    }
+
     match cart.get().await {
         Ok(products) => {
 
@@ -267,7 +282,7 @@ pub async fn place_order(
                         Some(value) => value,
                         None => "".to_string(),
                     },
-                    status: orders::OrderStatus::Pending,
+                    status: orders::OrderStatus::OnHold,
                     cart_hash: "".to_string(),
                 };
 
@@ -332,14 +347,12 @@ pub async fn place_order(
 
                         cart.reset();
                         session.insert("cart", current_cart).await.unwrap();
-
                         tera.register_filter("round_and_format", utils::round_and_format_filter);
 
                         let mut data = Context::new();
                         data.insert("partial", "order_details");
                         data.insert("title", "Order Details");
                         data.insert("number", &order_id);
-                        data.insert("cart", "yes");
                         data.insert("order", &order);
                         let rendered = tera.render("frontend/shopping.html", &data).unwrap();
                         Html(rendered)
