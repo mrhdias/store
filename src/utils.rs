@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-06-25 22:35:37
+// Last Modification: 2024-08-02 22:10:32
 //
 
 use tera::{Result, Value};
@@ -12,4 +12,12 @@ pub fn round_and_format_filter(value: &Value, params: &HashMap<String, Value>) -
         .ok_or_else(|| tera::Error::msg("Filter parameter 'places' is required and must be a positive integer"))?;
 
     Ok(Value::String(format!("{:.1$}", num, decimal_places as usize)))
+}
+
+use num_traits::float::Float;
+
+pub fn round_to_two_decimal_places<T: Float>(value: T) -> T {
+    // (value * T::from(100.0)).round() / T::from(100.0)
+
+    (value * T::from(100.00).unwrap()).round() / T::from(100.00).unwrap()
 }

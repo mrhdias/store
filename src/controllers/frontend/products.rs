@@ -1,7 +1,8 @@
 //
-// Last Modification: 2024-07-27 19:20:38
+// Last Modification: 2024-08-02 19:34:50
 //
 
+use crate::models::products::Parameters;
 use crate::types;
 use crate::utils;
 use crate::models::products;
@@ -51,13 +52,13 @@ pub async fn product(
 
 pub async fn product_category(
     Path(slug):Path<String>,
-    Query(pagination): Query<types::Pagination>,
+    Query(parameters): Query<Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
         let products_manager = products::Products::new(pool.clone()).await;
 
-        let per_page = pagination.per_page.unwrap_or(3);
+        let per_page = parameters.per_page.unwrap_or(3);
         
         let total = products_manager
             .frontend()
@@ -71,7 +72,7 @@ pub async fn product_category(
 
         let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
     
-        let mut page = pagination.page.unwrap_or(1) as i32;
+        let mut page = parameters.page.unwrap_or(1) as i32;
         if page > total_pages {
             page = total_pages;
         } else if page == 0 {
@@ -82,7 +83,9 @@ pub async fn product_category(
             &slug,
             page, 
             per_page as i32,
-            pagination.order.unwrap_or(types::Order::Desc)).await {
+            parameters.order_by.unwrap_or(products::OrderBy::Date),
+            parameters.order.unwrap_or(types::Order::Desc),
+        ).await {
             Ok(products) => {
     
                 let categories = match products_manager.frontend().categories().await {
@@ -115,13 +118,13 @@ pub async fn product_category(
 }
 
 pub async fn list(
-    Query(pagination): Query<types::Pagination>,
+    Query(parameters): Query<Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>)  -> Html<String> {
 
     let products_manager = products::Products::new(pool.clone()).await;
 
-    let per_page = pagination.per_page.unwrap_or(3);
+    let per_page = parameters.per_page.unwrap_or(3);
     
     let total = match products_manager
         .frontend()
@@ -136,24 +139,37 @@ pub async fn list(
 
     let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
 
-    let mut page = pagination.page.unwrap_or(1) as i32;
+    let mut page = parameters.page.unwrap_or(1) as i32;
     if page > total_pages {
         page = total_pages;
     } else if page == 0 {
         page = 1;
     }
 
+    // minimum and maximum price without pagination
+    let (min_price, max_price) = match products_manager.frontend()
+        .get_price_range(Some(products::Status::Publish)).await {
+            Ok(range) => range,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Html("An error happened while fetching price range".to_string());
+            },
+        };
+
     let products = if total > 0 {
+
         match products_manager.frontend().get_all(
             Some(products::Status::Publish),
             page, 
             per_page as i32,
-            pagination.order.unwrap_or(types::Order::Desc)).await {
-                Ok(products) => products,
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    return Html("An error occurred while fetching products.".to_string());
-                }
+            parameters.order_by.unwrap_or(products::OrderBy::Date),
+            parameters.order.unwrap_or(types::Order::Desc),
+        ).await {
+            Ok(products) => products,
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                return Html("An error happened while fetching products.".to_string());
+            },
         }
     } else {
         vec![]
@@ -172,6 +188,8 @@ pub async fn list(
     let mut data = Context::new();
     data.insert("path", "/products");
     data.insert("categories", &categories);
+    data.insert("min_price", &min_price);
+    data.insert("max_price", &max_price);
     data.insert("products", &products);
     data.insert("current_page", &page);
     data.insert("total_products", &total);

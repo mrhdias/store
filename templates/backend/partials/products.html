@@ -91,7 +91,7 @@ table.admin.product-list {
         <a href="/admin/products?page=1">«</a>
         <a href="/admin/products?page={{ previous_page }}">‹</a>
         <form id="pagination" method="get" action="/admin/products">
-            <input type="number" name="page" value="{{ current_page }}" min="1" max="2">
+            <input type="number" name="page" value="{{ current_page }}" min="1" max="{{ total_pages }}">
         </form>
         <span>of {{ total_pages }}</span>
         <a href="/admin/products?page={{ next_page }}">›</a>

@@ -57,6 +57,35 @@ impl OrderStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum OrderBy {
+    Date, // default
+    Modified,
+    Id,
+    // Include,
+    // Title,
+    // Slug,
+    // Price,
+}
+
+impl OrderBy {
+    pub fn as_str(&self) -> &str {
+        match self {
+            OrderBy::Date => "date_created",
+            OrderBy::Modified => "date_modified",
+            OrderBy::Id => "id",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Parameters {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+    pub order: Option<types::Order>,
+    pub order_by: Option<OrderBy>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Billing {
     pub first_name: String,
     pub last_name: String,
@@ -142,6 +171,7 @@ impl Orders {
     pub async fn get_all(&self,
         page: i32,
         per_page: i32,
+        order_by: OrderBy,
         order: types::Order) -> Result<Vec<OrderRow>, anyhow::Error> {
         // Implementation to get orders
 
@@ -154,9 +184,9 @@ impl Orders {
                 orders.total
             FROM orders
             ORDER BY 
-                orders.date_created {}
+                orders.{} {}
             LIMIT $1 OFFSET $2;
-        "#, order.as_str()))
+        "#, order_by.as_str(), order.as_str()))
             .bind(per_page)
             .bind(offset)
             .map(|row: PgRow| OrderRow {

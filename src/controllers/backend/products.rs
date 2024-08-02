@@ -3,6 +3,7 @@
 //
 
 use crate::models;
+use crate::models::products::Parameters;
 use crate::types;
 use crate::utils;
 use crate::models::categories;
@@ -668,7 +669,7 @@ pub async fn new(
 }
 
 pub async fn list(
-    Query(pagination): Query<types::Pagination>,
+    Query(parameters): Query<Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
@@ -680,11 +681,11 @@ pub async fn list(
         .await
         .unwrap_or(0);
 
-    let per_page = pagination.per_page.unwrap_or(3);
+    let per_page = parameters.per_page.unwrap_or(3);
 
     let total_pages: i32 = (total_count as f32 / per_page as f32).ceil() as i32;
 
-    let mut page = pagination.page.unwrap_or(1) as i32;
+    let mut page = parameters.page.unwrap_or(1) as i32;
     if page > total_pages {
         page = total_pages;
     } else if page == 0 {
@@ -695,7 +696,9 @@ pub async fn list(
         match products_manager.backend().get_all(
             page, 
             per_page as i32,
-            pagination.order.unwrap_or(types::Order::Desc)).await {
+            parameters.order_by.unwrap_or(products::OrderBy::Date),
+            parameters.order.unwrap_or(types::Order::Desc)
+        ).await {
             Ok(products) => products,
             Err(e) => {
                 eprintln!("Error: {}", e);

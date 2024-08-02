@@ -3,6 +3,7 @@
 // Last Modification: 2024-07-30 18:46:35
 //
 
+use crate::models::orders::Parameters;
 use crate::types;
 use crate::utils;
 use crate::models::orders;
@@ -34,7 +35,7 @@ pub async fn edit(
 }
 
 pub async fn list(
-    Query(pagination): Query<types::Pagination>,
+    Query(parameters): Query<Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
@@ -45,11 +46,11 @@ pub async fn list(
         .await
         .unwrap_or(0);
 
-    let per_page = pagination.per_page.unwrap_or(3);
+    let per_page = parameters.per_page.unwrap_or(3);
 
     let total_pages: i32 = (total_count as f32 / per_page as f32).ceil() as i32;
 
-    let mut page = pagination.page.unwrap_or(1) as i32;
+    let mut page = parameters.page.unwrap_or(1) as i32;
     if page > total_pages {
         page = total_pages;
     } else if page == 0 {
@@ -63,7 +64,8 @@ pub async fn list(
         match orders_manager.get_all(
             page, 
             per_page as i32,
-            pagination.order.unwrap_or(types::Order::Desc)).await {
+            parameters.order_by.unwrap_or(orders::OrderBy::Date),
+            parameters.order.unwrap_or(types::Order::Desc)).await {
             Ok(orders) => orders,
             Err(e) => {
                 eprintln!("Error: {}", e);

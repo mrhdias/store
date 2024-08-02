@@ -1,8 +1,9 @@
 //
-// Last Modifications: 2024-07-27 18:21:53
+// Last Modifications: 2024-08-02 19:25:41
 //
 
 use crate::types;
+use crate::utils;
 use crate::models::frontend;
 use crate::models::backend;
 
@@ -30,6 +31,31 @@ use serde::{
     Deserialize
 };
 use serde_json::Value as JsonValue;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum OrderBy {
+    Date, // default
+    Modified,
+    Id,
+    // Include,
+    Title,
+    // Slug,
+    Price,
+    // Popularity,
+    // Rating,
+}
+
+impl OrderBy {
+    pub fn as_str(&self) -> &str {
+        match self {
+            OrderBy::Date => "date_created",
+            OrderBy::Modified => "date_modified",
+            OrderBy::Id => "id",
+            OrderBy::Title => "name",
+            OrderBy::Price => "price",
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, EnumIter)]
 #[sqlx(type_name = "status", rename_all = "lowercase")]
@@ -69,6 +95,14 @@ impl StockStatus {
             StockStatus::OnBackorder => "onbackorder",
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Parameters {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+    pub order: Option<types::Order>,
+    pub order_by: Option<OrderBy>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -173,6 +207,7 @@ impl<'a> Frontend<'a> {
         slug: &str,
         page: i32,
         per_page: i32,
+        order_by: OrderBy,
         order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
@@ -193,9 +228,9 @@ impl<'a> Frontend<'a> {
             FROM products, product_categories, categories
             WHERE products.status = 'publish' AND products.id = product_categories.product_id AND categories.id = product_categories.category_id AND categories.slug = $1
             ORDER BY
-                products.date_created {}
+                products.{} {}
             LIMIT $2 OFFSET $3;
-        "#, order.as_str()))
+        "#, order_by.as_str(), order.as_str()))
             .bind(slug)
             .bind(per_page)
             .bind(offset)
@@ -376,10 +411,39 @@ impl<'a> Frontend<'a> {
         Ok(product)
     }
 
+    pub async fn get_price_range(&self,
+        status: Option<Status>) -> Result<(f32, f32), anyhow::Error> {
+
+        let from = match status {
+            Some(status) => format!("products WHERE products.status = '{}'", status.as_str()),
+            None => "products".to_string(),
+        };
+
+        #[derive(Debug, sqlx::FromRow)]
+        struct PriceRange {
+            min_price: Decimal,
+            max_price: Decimal,
+        }
+
+        let range: PriceRange = sqlx::query_as::<_, PriceRange>(&format!(r#"
+            SELECT
+                COALESCE(MIN(price), 0.00) AS min_price,
+                COALESCE(MAX(price), 0.00) AS max_price
+            FROM {};
+        "#, from))
+            .fetch_one(self.pool)
+            .await?;
+
+        let x: f32 = 3.2345;
+
+        Ok((range.min_price.to_f32().unwrap(), range.max_price.to_f32().unwrap()))
+    }
+
     pub async fn get_all(&self,
         status: Option<Status>,
         page: i32,
         per_page: i32,
+        order_by: OrderBy,
         order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
@@ -388,6 +452,11 @@ impl<'a> Frontend<'a> {
             Some(status) => format!("products WHERE products.status = '{}'", status.as_str()),
             None => "products".to_string(),
         };
+
+        // let order_by = match order_by {
+        //     Some(o) => o,
+        //     None => OrderBy::Date, // Dafault order by date
+        // };
 
         let products = sqlx::query(&format!(r#"
             SELECT
@@ -404,9 +473,9 @@ impl<'a> Frontend<'a> {
             ) AS gallery
             FROM {}
             ORDER BY
-                products.date_created {}
+                products.{} {}
             LIMIT $1 OFFSET $2;
-        "#, from, order.as_str()))
+        "#, from, order_by.as_str(), order.as_str()))
             .bind(per_page)
             .bind(offset)
             .map(|row: PgRow| frontend::ProductShort {
@@ -706,6 +775,7 @@ impl<'a> Backend<'a> {
     pub async fn get_all(&self,
         page: i32,
         per_page: i32,
+        order_by: OrderBy,
         order: types::Order) -> Result<Vec<backend::ProductShort>, anyhow::Error> {
         // Implementation to get products
 
@@ -730,9 +800,9 @@ impl<'a> Backend<'a> {
                 ORDER BY product_media.position LIMIT 1
             ) AS image ON true 
             ORDER BY 
-                products.date_created {}
+                products.{} {}
             LIMIT $1 OFFSET $2;
-        "#, order.as_str()))
+        "#, order_by.as_str(), order.as_str()))
             .bind(per_page)
             .bind(offset)
             .map(|row: PgRow| backend::ProductShort {
