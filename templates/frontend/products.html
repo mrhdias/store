@@ -101,23 +101,36 @@
             </div>
             {% endif %}
 
-            <div class="box">
-                <h3 class="title">Price:</h3>
-                <form oninput="result.value=parseFloat(min_price.value).toFixed(2).toString() + ' €'">
-                    <label for="minimum-price">Minimum</label>
-                    <input type="range" id="minimum-price" name="min_price"
-                        min="{{ min_price }}" max="{{ max_price }}"
-                        value="{{ min_price | round_and_format(places=2) }}" step="0.001" />
-                    <output name="result" for="minimum-price">{{ min_price | round_and_format(places=2) }} €</output>
-                </form>
-                <form oninput="result.value=parseFloat(max_price.value).toFixed(2).toString() + ' €'">
-                    <label for="maximum-price">Maximum</label>
-                    <input type="range" id="maximum-price" name="max_price"
-                        min="{{ min_price }}" max="{{ max_price }}"
-                        value="{{ max_price | round_and_format(places=2) }}" step="0.001" />
-                    <output name="result" for="maximum-price">{{ max_price | round_and_format(places=2) }} €</output>
-                </form>
-            </div>
+            <form id="product-filter" method="get" action="{{path}}">
+                <div class="box">
+                    <h3 class="title">Price:</h3>
+                    <div>
+                        <label for="minimum-price">Minimum</label>
+                        <input type="range" id="minimum-price" name="min_price"
+                            min="{{ min_price | round_and_format(places=2) }}" max="{{ max_price | round_and_format(places=2) }}"
+                            value="{{ min_price | round_and_format(places=2) }}" step="0.01"
+                            oninput="range_price(this);" />
+                        <output name="result" for="minimum-price">{{ min_price | round_and_format(places=2) }} €</output>
+                    </div>
+                    <div>
+                        <label for="maximum-price">Maximum</label>
+                        <input type="range" id="maximum-price" name="max_price"
+                            min="{{ min_price | round_and_format(places=2) }}" max="{{ max_price | round_and_format(places=2) }}"
+                            value="{{ max_price | round_and_format(places=2) }}" step="0.01"
+                            oninput="range_price(this);" />
+                        <output name="result" for="maximum-price">{{ max_price | round_and_format(places=2) }} €</output>
+                    </div>
+                </div>
+
+                <div class="box" style="flex-direction: row; gap: 5px;">
+                    <input id="on-sale" type="checkbox" name="on_sale" value="true" {% if on_sale == true %}checked{% endif %}>
+                    <label for="on-sale">On Sale</label>
+                </div>
+
+                <div>
+                    <button type="submit">Filter</button>
+                </div>
+            </form>
 
 
         </div>
@@ -181,6 +194,14 @@
             </ul>
         {% endif %}
         </div>
+
+        <script>
+            function range_price(inputElement) {
+                const price = parseFloat(inputElement.value).toFixed(2).toString();
+                inputElement.parentNode.children[2].value = price + ' €';
+                inputElement.value = price;
+            }
+        </script></script>
     </main>
 
     {% include 'frontend/partials/footer.html' %}

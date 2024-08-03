@@ -1,9 +1,8 @@
 //
-// Last Modifications: 2024-08-02 19:25:41
+// Last Modifications: 2024-08-03 18:41:57
 //
 
 use crate::types;
-use crate::utils;
 use crate::models::frontend;
 use crate::models::backend;
 
@@ -31,6 +30,8 @@ use serde::{
     Deserialize
 };
 use serde_json::Value as JsonValue;
+
+use super::frontend::ProductPage;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum OrderBy {
@@ -98,11 +99,20 @@ impl StockStatus {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Parameters {
+pub struct ProductParameters {
+    pub status: Option<Status>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
     pub order: Option<types::Order>,
     pub order_by: Option<OrderBy>,
+    pub featured: Option<bool>,
+    pub sku: Option<String>, // Limit result set to products with a specific SKU.
+    pub exclude: Option<String>, // array - Ensure result set excludes specific IDs.
+    pub include: Option<String>, // array - Limit result set to specific ids.
+    pub on_sale: Option<bool>,
+    pub min_price: Option<f32>,
+    pub max_price: Option<f32>,
+    pub stock_status: Option<StockStatus>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -154,6 +164,54 @@ pub struct Category {
     has_childs: bool, // if has childs
     branches: i32, // number of branches in the tree
     product_count: i64, // number of products
+}
+
+fn where_clause(parameters: &ProductParameters) -> String {
+
+    let mut where_parts = Vec::new();
+
+    if parameters.status.is_some() {
+        where_parts.push(format!("products.status = '{}'",
+            parameters.status.as_ref().unwrap().as_str().to_string()));
+    }
+    if parameters.on_sale.is_some() {
+        where_parts.push(format!("products.on_sale = {}",
+            parameters.on_sale.unwrap()));
+    }
+    if parameters.featured.is_some() {
+        where_parts.push(format!("products.featured = {}",
+            parameters.featured.unwrap()));
+    }
+    if parameters.min_price.is_some() {
+        where_parts.push(format!("products.price >= {}",
+            parameters.min_price.unwrap()));
+    }
+    if parameters.max_price.is_some() {
+        where_parts.push(format!("products.price <= {}",
+            parameters.max_price.unwrap()));
+    }
+    if parameters.stock_status.is_some() {
+        where_parts.push(format!("products.stock_status = '{}'",
+            parameters.stock_status.as_ref().unwrap().as_str().to_string()));
+    }
+    if parameters.sku.is_some() {
+        where_parts.push(format!("products.sku IN ({})",
+            parameters.sku.as_ref().unwrap().as_str().to_string()));
+    }
+    if parameters.include.is_some() {
+        where_parts.push(format!("products.id IN ({})",
+            parameters.include.as_ref().unwrap().as_str().to_string()));
+    }
+    if parameters.exclude.is_some() {
+        where_parts.push(format!("products.id NOT IN ({})",
+            parameters.exclude.as_ref().unwrap().as_str().to_string()));
+    }
+
+    if where_parts.is_empty() {
+        "products".to_string()
+    } else {
+        format!("products WHERE {}", where_parts.join(" AND "))
+    }
 }
 
 pub struct Products {
@@ -411,22 +469,19 @@ impl<'a> Frontend<'a> {
         Ok(product)
     }
 
-    pub async fn get_price_range(&self,
-        status: Option<Status>) -> Result<(f32, f32), anyhow::Error> {
+    pub async fn get_page(&self,
+        parameters: &ProductParameters) -> Result<frontend::ProductPage, anyhow::Error> {
 
-        let from = match status {
-            Some(status) => format!("products WHERE products.status = '{}'", status.as_str()),
-            None => "products".to_string(),
-        };
+        let per_page = parameters.per_page.unwrap_or(3) as i32;
 
-        #[derive(Debug, sqlx::FromRow)]
-        struct PriceRange {
-            min_price: Decimal,
-            max_price: Decimal,
-        }
+        let order = parameters.order.as_ref().unwrap_or(&types::Order::Asc);
+        let order_by = parameters.order_by.as_ref().unwrap_or(&OrderBy::Date);
 
-        let range: PriceRange = sqlx::query_as::<_, PriceRange>(&format!(r#"
-            SELECT
+        let from = where_clause(&parameters);
+
+        let (total, min_price, max_price): (i64, Decimal, Decimal) = sqlx::query_as(&format!(r#"
+            SELECT 
+                COUNT(*),
                 COALESCE(MIN(price), 0.00) AS min_price,
                 COALESCE(MAX(price), 0.00) AS max_price
             FROM {};
@@ -434,29 +489,24 @@ impl<'a> Frontend<'a> {
             .fetch_one(self.pool)
             .await?;
 
-        let x: f32 = 3.2345;
+        if total == 0 {
+            return Ok(ProductPage::new());
+        }
 
-        Ok((range.min_price.to_f32().unwrap(), range.max_price.to_f32().unwrap()))
-    }
+        let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
 
-    pub async fn get_all(&self,
-        status: Option<Status>,
-        page: i32,
-        per_page: i32,
-        order_by: OrderBy,
-        order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
+        let page = || -> i32 {
+            let page = parameters.page.unwrap_or(1) as i32;
+            if page > total_pages {
+                return total_pages;
+            }
+            if page == 0 {
+                return 1;
+            }
+            page
+        }();
 
         let offset = (page - 1) * per_page;
-
-        let from = match status {
-            Some(status) => format!("products WHERE products.status = '{}'", status.as_str()),
-            None => "products".to_string(),
-        };
-
-        // let order_by = match order_by {
-        //     Some(o) => o,
-        //     None => OrderBy::Date, // Dafault order by date
-        // };
 
         let products = sqlx::query(&format!(r#"
             SELECT
@@ -507,20 +557,15 @@ impl<'a> Frontend<'a> {
             .fetch_all(self.pool)
             .await?;
 
-        Ok(products)
-    }
-
-    pub async fn count_all(&mut self, status: Option<Status>) -> Result<i32, anyhow::Error> {
-        let from = match status {
-            Some(status) => format!("products WHERE status = '{}'", status.as_str()),
-            None => "products".to_string(),
-        };
-
-        let total_count: (i64, ) = sqlx::query_as(&format!("SELECT COUNT(*) FROM {};", from))
-            .fetch_one(self.pool)
-            .await?;
-
-        Ok(total_count.0 as i32)
+        Ok(ProductPage{
+            products,
+            total_count: total as i32,
+            current_page: page,
+            per_page,
+            total_pages,
+            min_price: min_price.to_f32().unwrap(),
+            max_price: max_price.to_f32().unwrap(),
+        })
     }
 
     pub fn new(pool: &'a sqlx::Pool<sqlx::Postgres>) -> Self {
@@ -772,68 +817,6 @@ impl<'a> Backend<'a> {
         Ok(())
     }
 
-    pub async fn get_all(&self,
-        page: i32,
-        per_page: i32,
-        order_by: OrderBy,
-        order: types::Order) -> Result<Vec<backend::ProductShort>, anyhow::Error> {
-        // Implementation to get products
-
-        let offset = (page - 1) * per_page;
-
-        let products = sqlx::query(&format!(r#"
-            SELECT
-                products.id, products.sku, products.name, products.price,
-                products.regular_price, products.sale_price, products.on_sale,
-                products.stock_quantity, products.stock_status, products.date_created,
-                products.status, products.primary_category,
-                COALESCE(image.src, '/assets/images/product.jpg') AS image_src, 
-                COALESCE(image.name, 'Unnamed product') AS image_name, 
-                COALESCE(image.alt, 'Unnamed product') AS image_alt
-            FROM products
-            LEFT JOIN LATERAL (
-                SELECT
-                    media.src, media.name, media.alt
-                FROM product_media
-                JOIN media
-                ON product_media.media_id = media.id WHERE product_media.product_id = products.id
-                ORDER BY product_media.position LIMIT 1
-            ) AS image ON true 
-            ORDER BY 
-                products.{} {}
-            LIMIT $1 OFFSET $2;
-        "#, order_by.as_str(), order.as_str()))
-            .bind(per_page)
-            .bind(offset)
-            .map(|row: PgRow| backend::ProductShort {
-                id: row.get::<i32, _>("id"),
-                sku: row.get::<String, _>("sku"),
-                name: row.get::<String, _>("name"),
-                regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
-                    Some(f) => f,
-                    None => 0.00,
-                },
-                sale_price: match row.get::<Decimal, _>("sale_price").to_f32() {
-                    Some(f) => f,
-                    None => 0.00,
-                },
-                on_sale: row.get::<bool, _>("on_sale"),
-                stock_status: row.get::<StockStatus, _>("stock_status"),
-                stock_quantity: row.get::<i32, _>("stock_quantity"),
-                image_src: row.get::<String, _>("image_src"),
-                image_alt: row.get::<String, _>("image_alt"),
-                date_created: || -> String {
-                    let date_created = row.get::<NaiveDateTime, _>("date_created");
-                    date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
-                }(),
-                status: row.get::<Status, _>("status"),
-            })
-            .fetch_all(self.pool)
-            .await?;
-
-        Ok(products)
-    }
-
     pub async fn get(&self, product_id: i32) -> Result<backend::Product, anyhow::Error> {
         // Implementation to get a product by ID
 
@@ -941,6 +924,102 @@ impl<'a> Backend<'a> {
             .await?;
 
         Ok(total_count.0 as i32)
+    }
+
+    pub async fn get_page(&self,
+        parameters: &ProductParameters) -> Result<backend::ProductPage, anyhow::Error> {
+
+        let per_page = parameters.per_page.unwrap_or(3) as i32;
+
+        let order = parameters.order.as_ref().unwrap_or(&types::Order::Asc);
+        let order_by = parameters.order_by.as_ref().unwrap_or(&OrderBy::Date);
+
+        let from = where_clause(&parameters);
+
+        let total: (i64, ) = sqlx::query_as(&format!(r#"
+            SELECT 
+                COUNT(*)
+            FROM {};
+        "#, from))
+            .fetch_one(self.pool)
+            .await?;
+
+        if total.0 == 0 {
+            return Ok(backend::ProductPage::new());
+        }
+
+        let total_pages: i32 = (total.0 as f32 / per_page as f32).ceil() as i32;
+
+        let page = || -> i32 {
+            let page = parameters.page.unwrap_or(1) as i32;
+            if page > total_pages {
+                return total_pages;
+            }
+            if page == 0 {
+                return 1;
+            }
+            page
+        }();
+
+        let offset = (page - 1) * per_page;
+
+        let products = sqlx::query(&format!(r#"
+            SELECT
+                products.id, products.sku, products.name, products.price,
+                products.regular_price, products.sale_price, products.on_sale,
+                products.stock_quantity, products.stock_status, products.date_created,
+                products.status, products.primary_category,
+                COALESCE(image.src, '/assets/images/product.jpg') AS image_src, 
+                COALESCE(image.name, 'Unnamed product') AS image_name, 
+                COALESCE(image.alt, 'Unnamed product') AS image_alt
+            FROM products
+            LEFT JOIN LATERAL (
+                SELECT
+                    media.src, media.name, media.alt
+                FROM product_media
+                JOIN media
+                ON product_media.media_id = media.id WHERE product_media.product_id = products.id
+                ORDER BY product_media.position LIMIT 1
+            ) AS image ON true 
+            ORDER BY 
+                products.{} {}
+            LIMIT $1 OFFSET $2;
+        "#, order_by.as_str(), order.as_str()))
+            .bind(per_page)
+            .bind(offset)
+            .map(|row: PgRow| backend::ProductShort {
+                id: row.get::<i32, _>("id"),
+                sku: row.get::<String, _>("sku"),
+                name: row.get::<String, _>("name"),
+                regular_price: match row.get::<Decimal, _>("regular_price").to_f32() {
+                    Some(f) => f,
+                    None => 0.00,
+                },
+                sale_price: match row.get::<Decimal, _>("sale_price").to_f32() {
+                    Some(f) => f,
+                    None => 0.00,
+                },
+                on_sale: row.get::<bool, _>("on_sale"),
+                stock_status: row.get::<StockStatus, _>("stock_status"),
+                stock_quantity: row.get::<i32, _>("stock_quantity"),
+                image_src: row.get::<String, _>("image_src"),
+                image_alt: row.get::<String, _>("image_alt"),
+                date_created: || -> String {
+                    let date_created = row.get::<NaiveDateTime, _>("date_created");
+                    date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
+                }(),
+                status: row.get::<Status, _>("status"),
+            })
+            .fetch_all(self.pool)
+            .await?;
+
+        Ok(backend::ProductPage {
+            products,
+            total_pages,
+            current_page: page,
+            total_count: total.0 as i32,
+            per_page,
+        })
     }
 
     pub fn new(pool: &'a sqlx::Pool<sqlx::Postgres>) -> Self {

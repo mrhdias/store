@@ -2,11 +2,11 @@
 // Last Modification: 2024-08-02 19:34:50
 //
 
-use crate::models::products::Parameters;
+use crate::models::products;
 use crate::types;
 use crate::utils;
-use crate::models::products;
 
+use axum::http::status;
 use axum::{
     extract::{
         Extension,
@@ -52,7 +52,7 @@ pub async fn product(
 
 pub async fn product_category(
     Path(slug):Path<String>,
-    Query(parameters): Query<Parameters>,
+    Query(parameters): Query<products::ProductParameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
@@ -118,64 +118,25 @@ pub async fn product_category(
 }
 
 pub async fn list(
-    Query(parameters): Query<Parameters>,
+    Query(parameters): Query<products::ProductParameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>)  -> Html<String> {
 
     let products_manager = products::Products::new(pool.clone()).await;
 
-    let per_page = parameters.per_page.unwrap_or(3);
-    
-    let total = match products_manager
-        .frontend()
-        .count_all(Some(products::Status::Publish))
+    let page = match products_manager.frontend()
+        .get_page(&parameters)
         .await {
-        Ok(t) => t,
+        Ok(page) => page,
         Err(e) => {
             eprintln!("Error: {}", e);
-            return Html("An error occurred while fetching product count.".to_string());
-        }
+            return Html("An error happened while fetching products".to_string());
+        },
     };
 
-    let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
-
-    let mut page = parameters.page.unwrap_or(1) as i32;
-    if page > total_pages {
-        page = total_pages;
-    } else if page == 0 {
-        page = 1;
-    }
-
-    // minimum and maximum price without pagination
-    let (min_price, max_price) = match products_manager.frontend()
-        .get_price_range(Some(products::Status::Publish)).await {
-            Ok(range) => range,
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                return Html("An error happened while fetching price range".to_string());
-            },
-        };
-
-    let products = if total > 0 {
-
-        match products_manager.frontend().get_all(
-            Some(products::Status::Publish),
-            page, 
-            per_page as i32,
-            parameters.order_by.unwrap_or(products::OrderBy::Date),
-            parameters.order.unwrap_or(types::Order::Desc),
-        ).await {
-            Ok(products) => products,
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                return Html("An error happened while fetching products.".to_string());
-            },
-        }
-    } else {
-        vec![]
-    };
-
-    let categories = match products_manager.frontend().categories().await {
+    let categories = match products_manager.frontend()
+        .categories()
+        .await {
         Ok(categories) => categories,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -188,14 +149,18 @@ pub async fn list(
     let mut data = Context::new();
     data.insert("path", "/products");
     data.insert("categories", &categories);
-    data.insert("min_price", &min_price);
-    data.insert("max_price", &max_price);
-    data.insert("products", &products);
-    data.insert("current_page", &page);
-    data.insert("total_products", &total);
-    data.insert("per_page", &per_page);
-    data.insert("total_pages", &total_pages);
-
+    data.insert("min_price", &page.min_price);
+    data.insert("max_price", &page.max_price);
+    data.insert("products", &page.products);
+    data.insert("current_page", &page.current_page);
+    data.insert("total_products", &page.total_count);
+    data.insert("per_page", &page.per_page);
+    data.insert("total_pages", &page.total_pages);
+    data.insert("on_sale", match &parameters.on_sale {
+        Some(value) => value,
+        None => &false,
+    });
+    
     let rendered = tera.render("frontend/products.html", &data).unwrap();
     Html(rendered)
 }

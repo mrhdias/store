@@ -48,3 +48,25 @@ pub struct Product {
     pub categories: Vec<i32>,
     pub images: Vec<ProductImage>
 }
+
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProductPage {
+    pub products: Vec<ProductShort>,
+    pub total_count: i32,
+    pub current_page: i32,
+    pub per_page: i32,
+    pub total_pages: i32,
+}
+
+impl ProductPage {
+    pub fn new() -> Self {
+        ProductPage {
+            products: Vec::new(),
+            total_count: 0,
+            current_page: 0,
+            per_page: 0,
+            total_pages: 0,
+        }
+    }
+}

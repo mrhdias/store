@@ -1,13 +1,12 @@
 //
-// Last Modification: 2024-08-01 18:53:18
+// Last Modification: 2024-08-03 18:40:03
 //
 
-use crate::models;
-use crate::models::products::Parameters;
-use crate::types;
 use crate::utils;
-use crate::models::categories;
+
+use crate::models;
 use crate::models::products;
+use crate::models::categories;
 
 use anyhow;
 use slug::slugify;
@@ -668,8 +667,9 @@ pub async fn new(
     Html(rendered)
 }
 
-pub async fn list(
-    Query(parameters): Query<Parameters>,
+/*
+pub async fn old_list(
+    Query(parameters): Query<products::ProductParameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
@@ -718,6 +718,38 @@ pub async fn list(
     data.insert("total_products", &total_count);
     data.insert("per_page", &per_page);
     data.insert("total_pages", &total_pages);
+
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
+    Html(rendered)
+}
+*/
+
+pub async fn list(
+    Query(parameters): Query<products::ProductParameters>,
+    Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
+    Extension(mut tera): Extension<Tera>) -> Html<String> {
+
+    let products_manager = products::Products::new(pool).await;
+
+    let page = match products_manager.backend()
+        .get_page(&parameters)
+        .await {
+        Ok(page) => page,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return Html("An error happened while fetching products".to_string());
+        },
+    };
+
+    tera.register_filter("round_and_format", utils::round_and_format_filter);
+
+    let mut data = Context::new();
+    data.insert("partial", "products");
+    data.insert("products", &page.products);
+    data.insert("current_page", &page.current_page);
+    data.insert("total_products", &page.total_count);
+    data.insert("per_page", &page.per_page);
+    data.insert("total_pages", &page.total_pages);
 
     let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)
