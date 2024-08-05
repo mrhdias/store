@@ -13,11 +13,38 @@
     flex-direction: column;
     align-items: flex-end;
 }
+/*
 .pagination {
     display: flex;
     flex-direction: row;
     gap: 5px;
     align-items: center;
+}
+*/
+.pagination {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    align-items: center;
+}
+
+.pagination > li > a {
+    display: block;
+    background-color: #e0e0e0;
+    border-radius: 50%;
+    height: 24px;
+    aspect-ratio: 1 / 1;
+    text-align: center;
+    text-decoration: none;
+    font-size: 12px;
+    line-height: 24px;
+}
+
+.pagination > li.current_page > a {
+    background-color: #9e9e9e;
 }
 
 .box {
@@ -103,22 +130,25 @@
 
             <form id="product-filter" method="get" action="{{path}}">
                 <div class="box">
-                    <h3 class="title">Price:</h3>
+                    <h3 class="title">Price: <span id="price-range-status" style="font-weight: normal; font-size: 14px;">{% if min_price < 0 and max_price < 0 %}Off{% else %}On{% endif %}</span></h3>
                     <div>
                         <label for="minimum-price">Minimum</label>
+                        {%- macro set_price(default, price, method='common') -%}
+                            {% if price < 0 %}{{ default | round(method=method) }}{% else %}{{ price | round(method=method) }}{% endif %}
+                        {%- endmacro set_price -%}
                         <input type="range" id="minimum-price" name="min_price"
-                            min="{{ min_price | round_and_format(places=2) }}" max="{{ max_price | round_and_format(places=2) }}"
-                            value="{{ min_price | round_and_format(places=2) }}" step="0.01"
-                            oninput="range_price(this);" />
-                        <output name="result" for="minimum-price">{{ min_price | round_and_format(places=2) }} €</output>
+                            min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
+                            value="{{ self::set_price(default=default_min_price, price=min_price, method='floor') }}" step="1"
+                            oninput="rangePrice(this);" />
+                        <output name="result" for="minimum-price">{{ self::set_price(default=default_min_price, price=min_price, method='floor') }} €</output>
                     </div>
                     <div>
                         <label for="maximum-price">Maximum</label>
                         <input type="range" id="maximum-price" name="max_price"
-                            min="{{ min_price | round_and_format(places=2) }}" max="{{ max_price | round_and_format(places=2) }}"
-                            value="{{ max_price | round_and_format(places=2) }}" step="0.01"
-                            oninput="range_price(this);" />
-                        <output name="result" for="maximum-price">{{ max_price | round_and_format(places=2) }} €</output>
+                            min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
+                            value="{{ self::set_price(default=default_max_price, price=max_price) }}" step="1"
+                            oninput="rangePrice(this);" />
+                        <output name="result" for="maximum-price">{{ self::set_price(default=default_max_price, price=max_price) }} €</output>
                     </div>
                 </div>
 
@@ -128,7 +158,8 @@
                 </div>
 
                 <div>
-                    <button type="submit">Filter</button>
+                    <button type="button" onclick="filter();">Filter</button>
+                    <button type="button" onclick="resetFilters();">Reset</button>
                 </div>
             </form>
 
@@ -138,28 +169,22 @@
         {% if products | length == 0  %}
             <span style="width: 100%;">The product catalog is empty!</span>
         {% else %}
-            {% if total_pages > 1 %}
-                {% set previous_page = current_page - 1 %}
-                {% if previous_page == 0 %}
-                    {% set previous_page = 1 %}
+            <div style="display: flex; gap: 10px;">
+                <span style="background-color: #b0bec5;padding: 2px 6px;border-radius: 5px;font-size: 14px;">{{ total_products }} items</span>
+                {% if products | length > 1  %}
+                <form id="sort-products" method="get" action="{{path}}">
+                    <input type="hidden" name="min_price" value="{{ min_price | round(method='floor') }}">
+                    <input type="hidden" name="max_price" value="{{ max_price | round }}">
+                    <input type="hidden" name="on_sale" value="{{ on_sale }}">
+                    <select name="sort" onchange="sortProducts(this);">
+                    {% for option in ['date::asc::Latest', 'price::asc::Price: Low to High', 'price::desc::Price: High to Low'] %}
+                        {% set parts = option | split(pat='::') %}
+                        <option value="{{ parts[0] }}_{{ parts[1] }}" {% if order_by == parts[0] and order == parts[1] %}selected{% endif %}>{{ parts[2] }}</option>
+                    {% endfor %}
+                    </select>
+                </form>
                 {% endif %}
-                {% set next_page = current_page + 1 %}
-                {% if next_page > total_pages %}
-                    {% set next_page = current_page %}
-                {% endif %}
-                <div class="pagination">
-                    <span>{{ total_products }} items</span>
-                    <a href="{{path}}?page=1">«</a>
-                    <a href="{{path}}?page={{ previous_page }}">‹</a>
-                    <form id="pagination" method="get" action="{{path}}">
-                        <input type="number" name="page" value="{{ current_page }}" min="1" max="{{ total_pages }}">
-                    </form>
-                    <span>of {{ total_pages }}</span>
-                    <a href="{{path}}?page={{ next_page }}">›</a>
-                    <a href="{{path}}?page={{ total_pages }}">»</a>
-                </div>
-            {% endif %}
-
+            </div>
             <ul class="product-list">
                 {% for product in products %}
                 <li>
@@ -192,16 +217,122 @@
                 </li>
                 {% endfor %}
             </ul>
+
+            {% if total_pages > 1 %}
+                {% set previous_page = current_page - 1 %}
+                {% if previous_page == 0 %}
+                    {% set previous_page = 1 %}
+                {% endif %}
+                {% set next_page = current_page + 1 %}
+                {% if next_page > total_pages %}
+                    {% set next_page = current_page %}
+                {% endif %}
+                <div style="display: flex;gap: 10px;margin-top: 20px;width: 100%;justify-content: center;">
+                    <a href="{{path}}?page={{ previous_page }}{% if query != '' %}&{{ query }}{% endif %}">‹</a>
+                    <ul class="pagination">
+                    {% for page in range(end=total_pages) %}
+                        <li {% if current_page == page + 1 %}class="current_page"{% endif %}>
+                            <a href="{{path}}?page={{ page + 1 }}{% if query != '' %}&{{ query }}{% endif %}">{{ page + 1 }}</a>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                    <a href="{{path}}?page={{ next_page }}{% if query != '' %}&{{ query }}{% endif %}">›</a>
+                </div>
+            {% endif %}
+
         {% endif %}
         </div>
 
         <script>
-            function range_price(inputElement) {
-                const price = parseFloat(inputElement.value).toFixed(2).toString();
-                inputElement.parentNode.children[2].value = price + ' €';
-                inputElement.value = price;
+
+            function addField(name, value) {
+                const e = document.createElement('input')
+                e.type = 'hidden';
+                e.name = name;
+                e.value = value;
+                return e;
             }
-        </script></script>
+
+            // https://gomakethings.com/working-with-forms-with-vanilla-javascript/
+            function sortProducts(selectElement) {
+                const sort = selectElement.value.split('_', 2);
+
+                const form = document.getElementById('sort-products');
+
+                const customForm = document.createElement('form');
+                customForm.action = form.action;
+                customForm.method = form.method;
+
+                customForm.appendChild(addField('order_by', sort[0]));
+                customForm.appendChild(addField('order', sort[1]));
+
+                if (parseInt(form.querySelector('input[name="min_price"]').value, 10) > 0) {
+                    customForm.appendChild(addField('min_price', form.querySelector('input[name="min_price"]').value));
+                }
+                if (parseInt(form.querySelector('input[name="max_price"]').value, 10) > 0) {
+                    customForm.appendChild(addField('max_price', form.querySelector('input[name="max_price"]').value));
+                }
+                if (form.querySelector('input[name="on_sale"]').value === 'true') {
+                    customForm.appendChild(addField('on_sale', form.querySelector('input[name="on_sale"]').value));
+                }
+
+                document.body.appendChild(customForm);
+
+                customForm.submit();
+
+                customForm.parentNode.removeChild(customForm);
+            }
+
+            function rangePrice(inputElement) {
+                inputElement.parentNode.children[2].value = inputElement.value + ' €';
+                document.getElementById('price-range-status').textContent = 'On';
+            }
+
+            function filter() {
+                const form = document.getElementById('product-filter');
+
+                const customForm = document.createElement('form');
+                customForm.action = form.action;
+                customForm.method = form.method;
+
+                const minPriceField = document.getElementById('minimum-price');
+                const maxPriceField = document.getElementById('maximum-price');
+
+                if (parseInt(minPriceField.value, 10) != parseInt(minPriceField.min, 10) ||
+                    parseInt(maxPriceField.value, 10)!= parseInt(maxPriceField.max, 10)) {
+                    customForm.appendChild(addField('min_price', minPriceField.value));
+                    customForm.appendChild(addField('max_price', maxPriceField.value));
+                    form.querySelector('#price-range-status').textContent = 'On';
+                }
+
+                if (form.querySelector('#on-sale').checked) {
+                    customForm.appendChild(addField('on_sale', 'true'));
+                }
+
+                document.body.appendChild(customForm);
+                customForm.submit();
+
+                customForm.parentNode.removeChild(customForm);
+            }
+
+            function resetFilters() {
+                const form = document.getElementById('product-filter');
+
+                const minPriceField = document.getElementById('minimum-price');
+                const maxPriceField = document.getElementById('maximum-price');
+
+                minPriceField.value = minPriceField.min;
+                maxPriceField.value = maxPriceField.max;
+
+                form.querySelector('output[for="minimum-price"]').value = minPriceField.min;
+                form.querySelector('output[for="maximum-price"]').value = maxPriceField.max;
+
+                form.querySelector('#price-range-status').textContent = 'Off';
+
+                form.querySelector('#on-sale').checked = false;
+            }
+
+        </script>
     </main>
 
     {% include 'frontend/partials/footer.html' %}

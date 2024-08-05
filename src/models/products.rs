@@ -1,5 +1,5 @@
 //
-// Last Modifications: 2024-08-03 18:41:57
+// Last Modifications: 2024-08-05 22:40:14
 //
 
 use crate::types;
@@ -33,7 +33,9 @@ use serde_json::Value as JsonValue;
 
 use super::frontend::ProductPage;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "order_by", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum OrderBy {
     Date, // default
     Modified,
@@ -96,6 +98,16 @@ impl StockStatus {
             StockStatus::OnBackorder => "onbackorder",
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "catalog_visibility", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum CatalogVisibility {
+    Visible, // Default
+    Catalog,
+    Search,
+    Hidden,
 }
 
 #[derive(Debug, Deserialize)]
@@ -474,26 +486,41 @@ impl<'a> Frontend<'a> {
 
         let per_page = parameters.per_page.unwrap_or(3) as i32;
 
-        let order = parameters.order.as_ref().unwrap_or(&types::Order::Asc);
+        let order = parameters.order.as_ref().unwrap_or(&types::Order::Desc);
         let order_by = parameters.order_by.as_ref().unwrap_or(&OrderBy::Date);
 
-        let from = where_clause(&parameters);
+        // println!("{:?}", parameters);
 
-        let (total, min_price, max_price): (i64, Decimal, Decimal) = sqlx::query_as(&format!(r#"
-            SELECT 
-                COUNT(*),
+        let (min_price, max_price): (Decimal, Decimal) = sqlx::query_as(r#"
+            SELECT
                 COALESCE(MIN(price), 0.00) AS min_price,
                 COALESCE(MAX(price), 0.00) AS max_price
-            FROM {};
-        "#, from))
+            FROM products WHERE products.status = $1;
+        "#)
+            .bind(Status::Publish)
             .fetch_one(self.pool)
             .await?;
 
-        if total == 0 {
-            return Ok(ProductPage::new());
+
+        let from = where_clause(&parameters);
+
+        let total: (i64, ) = sqlx::query_as(&format!(r#"SELECT COUNT(*) FROM {};"#, from))
+            .fetch_one(self.pool)
+            .await?;
+
+        if total.0 == 0 {
+            return Ok(ProductPage {
+                products: Vec::new(),
+                total_count: 0,
+                current_page: 0,
+                per_page: 0,
+                total_pages: 0,
+                min_price: min_price.to_f32().unwrap(),
+                max_price: max_price.to_f32().unwrap(),
+            });
         }
 
-        let total_pages: i32 = (total as f32 / per_page as f32).ceil() as i32;
+        let total_pages: i32 = (total.0 as f32 / per_page as f32).ceil() as i32;
 
         let page = || -> i32 {
             let page = parameters.page.unwrap_or(1) as i32;
@@ -559,7 +586,7 @@ impl<'a> Frontend<'a> {
 
         Ok(ProductPage{
             products,
-            total_count: total as i32,
+            total_count: total.0 as i32,
             current_page: page,
             per_page,
             total_pages,

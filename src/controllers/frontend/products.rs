@@ -1,12 +1,11 @@
 //
-// Last Modification: 2024-08-02 19:34:50
+// Last Modification: 2024-08-05 22:39:54
 //
 
 use crate::models::products;
 use crate::types;
 use crate::utils;
 
-use axum::http::status;
 use axum::{
     extract::{
         Extension,
@@ -144,13 +143,62 @@ pub async fn list(
         }
     };
 
+    let mut query_parts = vec![];
+
+    if parameters.min_price.is_some() {
+        query_parts.push(format!("min_price={}",
+            page.min_price));
+    }
+    if parameters.max_price.is_some() {
+        query_parts.push(format!("max_price={}",
+            page.max_price));
+    }
+    if parameters.on_sale.is_some() {
+        query_parts.push(format!("on_sale={}",
+            parameters.on_sale.unwrap_or(false)));
+    }
+
+    let order = |o: &Option<types::Order>| -> String {
+        if o.is_some() {
+            let order = o.as_ref().unwrap_or(&types::Order::Desc);
+            query_parts.push(format!("order={}", order.as_str()));
+            return order.as_str().to_string();
+        }
+        "".to_string()
+    }(&parameters.order);
+
+    let order_by = |o: &Option<products::OrderBy>| -> String {
+        if o.is_some() {
+            let order_by = o.as_ref().unwrap_or(&products::OrderBy::Date);
+            query_parts.push(format!("order_by={}", order_by.as_str()));
+            return order_by.as_str().to_string();
+        }
+        "".to_string()
+    }(&parameters.order_by);
+
     tera.register_filter("round_and_format", utils::round_and_format_filter);
 
     let mut data = Context::new();
     data.insert("path", "/products");
     data.insert("categories", &categories);
-    data.insert("min_price", &page.min_price);
-    data.insert("max_price", &page.max_price);
+
+    // range price
+    data.insert("default_min_price", &page.min_price);
+    data.insert("default_max_price", &page.max_price);
+    data.insert("min_price", match &parameters.min_price {
+        Some(value) => value,
+        None => &-1.00,
+    });
+    data.insert("max_price", match &parameters.max_price {
+        Some(value) => value,
+        None => &-1.00,
+    });
+
+    data.insert("order", &order);
+    data.insert("order_by", &order_by);
+
+    data.insert("query", &query_parts.join("&"));
+
     data.insert("products", &page.products);
     data.insert("current_page", &page.current_page);
     data.insert("total_products", &page.total_count);

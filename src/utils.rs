@@ -14,10 +14,6 @@ pub fn round_and_format_filter(value: &Value, params: &HashMap<String, Value>) -
     Ok(Value::String(format!("{:.1$}", num, decimal_places as usize)))
 }
 
-use num_traits::float::Float;
-
-pub fn round_to_two_decimal_places<T: Float>(value: T) -> T {
-    // (value * T::from(100.0)).round() / T::from(100.0)
-
-    (value * T::from(100.00).unwrap()).round() / T::from(100.00).unwrap()
+pub fn round_to_two_decimal_places(value: &f32) -> f32 {
+    (value * 100.00).round() / 100.0
 }

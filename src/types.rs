@@ -27,7 +27,9 @@ impl StockStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "order", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum Order {
     Asc,
     Desc,
@@ -36,8 +38,8 @@ pub enum Order {
 impl Order {
     pub fn as_str(&self) -> &str {
         match self {
-            Order::Asc => "ASC",
-            Order::Desc => "DESC",
+            Order::Asc => "asc",
+            Order::Desc => "desc",
         }
     }
 }
