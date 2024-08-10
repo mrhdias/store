@@ -40,3 +40,4 @@ cargo run
 To view the store, enter the address http://0.0.0.0:8080/ in your favorite browser.
 
 ![Login Screenshot](https://raw.githubusercontent.com/mrhdias/store/main/screenshots/login.png)
+![Cart Screenshot](https://raw.githubusercontent.com/mrhdias/store/main/screenshots/cart.png)
