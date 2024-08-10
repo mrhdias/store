@@ -1,58 +1,50 @@
+{% import "backend/macros.html" as macros %}
 <style>
-table.admin {
-    table-layout: fixed;
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid #c3c4c7;
-}
-
-.admin thead {
-    border: 1px solid #c3c4c7;
-    background-color: #fff;
-}
-
-.admin th, td {
-    text-align: left;
-    padding: 4px 10px;
-}
-
-.admin .username {
+table.list-items .username {
     display: flex;
     flex-direction: row;
     gap: 8px;
-    align-items: center;
+    align-items: flex-start;
 }
 </style>
 
-<table id="users" class="admin">
-    <thead>
-        <th><input type="checkbox"></th>
-        <th>Username</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Role</th>
-        <th>Creation Date</th>
-    </thead>
-    <tbody>
-        {% for user in users %}
-        <tr>
-            <td style="width: 20px;"><input type="checkbox"></td>
-            <td class="username">
-                <img src="{{ user.avatar_url }}" alt="{{ user.username }}" />
-                <a href="/admin/users/{{ user.id }}">{{ user.username }}</a>
-            </td>
-            <td>
-            {% if user.first_name != "" %}
-                {{ user.first_name }}
-            {% endif %}
-            {% if user.last_name != "" %}
-                {{ user.last_name }}
-            {% endif %}
-            </td>
-            <td>{{ user.email }}</td>
-            <td>{{ user.role }}</td>
-            <td>{{ user.date_created }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<a href="/admin/users/new" class="add-new-item-btn">Add New</a>
+
+{% if users | length == 0 %}
+    <span class="alert">No users have been created.</span>
+{% else %}
+    {{ macros::backend_pagination(url="/admin/users", total=total_users) }}
+
+    <table id="users" class="list-items users">
+        <thead>
+            <th><input type="checkbox"></th>
+            <th>Username</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Creation Date</th>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td><input type="checkbox"></td>
+                <td class="username">
+                    <img src="{{ user.avatar_url }}" alt="{{ user.username }}" />
+                    <a href="/admin/users/{{ user.id }}">{{ user.username }}</a>
+                </td>
+                <td>
+                {% if user.first_name != "" %}
+                    {{ user.first_name }}
+                {% endif %}
+                {% if user.last_name != "" %}
+                    {{ user.last_name }}
+                {% endif %}
+                </td>
+                <td>{{ user.email }}</td>
+                <td>{{ user.role }}</td>
+                <td>{{ user.date_created }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}

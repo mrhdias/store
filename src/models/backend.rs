@@ -11,6 +11,8 @@ use serde::{
     Deserialize
 };
 
+// Products
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProductShort {
     pub id: i32,
@@ -63,6 +65,39 @@ impl ProductPage {
     pub fn new() -> Self {
         ProductPage {
             products: Vec::new(),
+            total_count: 0,
+            current_page: 0,
+            per_page: 0,
+            total_pages: 0,
+        }
+    }
+}
+
+// Categories
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CategoryShort {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+    pub parent: i32,
+    pub description: String,
+    pub count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CategoryPage {
+    pub categories: Vec<CategoryShort>,
+    pub total_count: i32,
+    pub current_page: i32,
+    pub per_page: i32,
+    pub total_pages: i32,
+}
+
+impl CategoryPage {
+    pub fn new() -> Self {
+        CategoryPage {
+            categories: Vec::new(),
             total_count: 0,
             current_page: 0,
             per_page: 0,

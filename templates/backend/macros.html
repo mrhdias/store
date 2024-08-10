@@ -1,0 +1,23 @@
+{% macro backend_pagination(url, total=0) %}
+    {% if total_pages > 1 %}
+        {% set previous_page = current_page - 1 %}
+        {% if previous_page == 0 %}
+            {% set previous_page = 1 %}
+        {% endif %}
+        {% set next_page = current_page + 1 %}
+        {% if next_page > total_pages %}
+            {% set next_page = current_page %}
+        {% endif %}
+        <div class="pagination">
+            <span>{{ total }} items</span>
+            <a href="{{ url }}?page=1">«</a>
+            <a href="{{ url }}?page={{ previous_page }}">‹</a>
+            <form id="pagination" method="get" action="{{ url }}">
+                <input type="number" name="page" value="{{ current_page }}" min="1" max="{{ total_pages }}">
+            </form>
+            <span>of {{ total_pages }}</span>
+            <a href="{{ url }}?page={{ next_page }}">›</a>
+            <a href="{{ url }}?page={{ total_pages }}">»</a>
+        </div>
+    {% endif %}
+{% endmacro backend_pagination %}

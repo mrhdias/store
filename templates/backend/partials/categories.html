@@ -1,3 +1,37 @@
-<div>
-    Categories
-</div>
+{% import "backend/macros.html" as macros %}
+<style>
+table.list-items .count {
+    width: 150px;
+    text-align: right;
+}
+</style>
+
+<a href="/admin/categories/new" class="add-new-item-btn">Add New</a>
+
+{% if categories | length == 0 %}
+    <span class="alert">There are no defined categories.</span>
+{% else %}
+    {{ macros::backend_pagination(url="/admin/categories", total=total_categories) }}
+
+    <table class="list-items categories">
+        <thead>
+            <th><input type="checkbox"></th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Slug</th>
+            <th class="count">Count</th>
+        </thead>
+        <tbody>
+            {% for category in categories %}
+            <tr>
+                <td><input type="checkbox"></td>
+                <td><a href="/admin/categories/{{ category.id }}">{{ category.name }}</a></td>
+                <td>{{ category.description }}</td>
+                <td>{{ category.slug }}</td>
+                <td class="count"><a href="#">{{ category.count }}</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% endif %}

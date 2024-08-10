@@ -1,6 +1,6 @@
 //
 // Description: Manage customer orders
-// Last Moficication: 2024-08-01 22:15:47
+// Last Moficication: 2024-08-09 21:51:52
 //
 
 use crate::types;
@@ -18,6 +18,8 @@ use serde::{
     Serialize,
     Deserialize
 };
+
+use super::products;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "currency", rename_all = "UPPERCASE")]
@@ -42,7 +44,7 @@ pub enum OrderStatus {
 }
 
 impl OrderStatus {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             OrderStatus::Pending => "pending",
             OrderStatus::Processing => "processing",
@@ -54,35 +56,6 @@ impl OrderStatus {
             OrderStatus::Trash => "trash",
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum OrderBy {
-    Date, // default
-    Modified,
-    Id,
-    // Include,
-    // Title,
-    // Slug,
-    // Price,
-}
-
-impl OrderBy {
-    pub fn as_str(&self) -> &str {
-        match self {
-            OrderBy::Date => "date_created",
-            OrderBy::Modified => "date_modified",
-            OrderBy::Id => "id",
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Parameters {
-    pub page: Option<u32>,
-    pub per_page: Option<u32>,
-    pub order: Option<types::Order>,
-    pub order_by: Option<OrderBy>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -154,12 +127,64 @@ pub struct Order {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OrderRow {
-    id: i32,
-    date_created: String,
-    customer_name: String,
-    status: String,
-    total: f32,
+pub struct OrderShort {
+    pub id: i32,
+    pub date_created: String,
+    pub customer_name: String,
+    pub status: String,
+    pub total: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OrderPage {
+    pub orders: Vec<OrderShort>,
+    pub total_count: i32,
+    pub current_page: i32,
+    pub per_page: i32,
+    pub total_pages: i32,
+}
+
+impl OrderPage {
+    pub fn new() -> Self {
+        OrderPage {
+            orders: Vec::new(),
+            total_count: 0,
+            current_page: 0,
+            per_page: 0,
+            total_pages: 0,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Parameters {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+    pub order: Option<types::Order>,
+    pub order_by: Option<String>,
+    pub after: Option<String>,
+    pub before: Option<String>,
+    pub modified_after: Option<String>,
+    pub modified_before: Option<String>,
+    pub product: Option<u32>,
+    pub status: Option<products::Status>,
+    pub customer: Option<u32>,
+}
+
+// date, modified, id, include, title and slug
+fn orders_order_by(parameter: &Option<String>) -> &str {
+    match parameter.as_ref() {
+        Some(v) => match v.as_str() {
+            "id" => "id",
+            "modified" => "date_modified",
+            // "include" => "?",
+            // "title" => "?",
+            // "slug" => "?",
+            "date" => "date_created",
+            _ => "date_created", // The default case
+        },
+        None => "date_created",
+    }
 }
 
 pub struct Orders {
@@ -167,64 +192,6 @@ pub struct Orders {
 }
 
 impl Orders {
-
-    pub async fn get_all(&self,
-        page: i32,
-        per_page: i32,
-        order_by: OrderBy,
-        order: types::Order) -> Result<Vec<OrderRow>, anyhow::Error> {
-        // Implementation to get orders
-
-        let offset = (page - 1) * per_page;
-
-        let orders = sqlx::query(&format!(r#"
-            SELECT
-                orders.id, orders.date_created, orders.status,
-                (billing->>'first_name') || ' ' || (billing->>'last_name') AS customer_name,
-                orders.total
-            FROM orders
-            ORDER BY 
-                orders.{} {}
-            LIMIT $1 OFFSET $2;
-        "#, order_by.as_str(), order.as_str()))
-            .bind(per_page)
-            .bind(offset)
-            .map(|row: PgRow| OrderRow {
-                id: row.get::<i32, _>("id"),
-                date_created: || -> String {
-
-                    let date_created = row.get::<NaiveDateTime, _>("date_created");
-                    let date_created_utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(date_created, Utc);
-
-                    let now = Utc::now();
-                    let duration = now.signed_duration_since(date_created_utc);
-
-                    match duration {
-                        d if d.num_days() > 0 => date_created.format("%b %d, %Y").to_string(),
-                        d if d.num_hours() > 0 => format!("{} hours ago", d.num_hours()),
-                        d if d.num_minutes() > 0 => format!("{} minutes ago", d.num_minutes()),
-                        d if d.num_seconds() > 0 => format!("{} seconds ago", d.num_seconds()),
-                        _ => "Just now".to_string(),
-                    }
-
-                    // date_created.format("%b %d, %Y").to_string()
-                    // date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
-                }(),
-                status: || -> String {
-                    let status = row.get::<OrderStatus, _>("status");
-                    status.as_str().to_string()
-                }(),
-                total: match row.get::<Decimal, _>("total").to_f32() {
-                    Some(f) => f,
-                    None => 0.00,
-                },
-                customer_name: row.get::<String, _>("customer_name"),
-            })
-            .fetch_all(&self.pool)
-            .await?;
-
-        Ok(orders)
-    }
 
     pub async fn add(&self, order: &Order) -> Result<i32, anyhow::Error> {
 
@@ -279,13 +246,99 @@ impl Orders {
         Ok(order_id)
     }
 
-    pub async fn count_all(&self) -> Result<i32, anyhow::Error> {
-        let total_count: i64 = sqlx::query("SELECT COUNT(*) FROM orders")
-            .fetch_one(&self.pool)
-            .await?
-            .get(0);
+    pub async fn get_page(&self,
+        parameters: &Parameters,
+    ) -> Result<OrderPage, anyhow::Error> {
 
-        Ok(total_count as i32)
+        let per_page = parameters.per_page.unwrap_or(3) as i32;
+
+        let order = parameters.order.as_ref().unwrap_or(&types::Order::Asc);
+        let order_by = orders_order_by(&parameters.order_by);
+
+        let total: (i64, ) = sqlx::query_as(r#"
+            SELECT COUNT(*) FROM orders;
+        "#)
+            .fetch_one(&self.pool)
+            .await?;
+
+        if total.0 == 0 {
+            return Ok(OrderPage {
+                orders: vec![],
+                total_pages: 0,
+                current_page: 0,
+                total_count: 0,
+                per_page: 0,
+            });
+        }
+
+        let total_pages: i32 = (total.0 as f32 / per_page as f32).ceil() as i32;
+
+        let page = || -> i32 {
+            let page = parameters.page.unwrap_or(1) as i32;
+            if page > total_pages {
+                return total_pages;
+            }
+            if page == 0 {
+                return 1;
+            }
+            page
+        }();
+
+        let offset = (page - 1) * per_page;
+
+        let orders = sqlx::query(&format!(r#"
+            SELECT
+                orders.id, orders.date_created, orders.status,
+                (billing->>'first_name') || ' ' || (billing->>'last_name') AS customer_name,
+                orders.total
+            FROM orders
+            ORDER BY 
+                orders.{} {}
+            LIMIT $1 OFFSET $2;
+        "#, order_by, order.as_str()))
+            .bind(per_page)
+            .bind(offset)
+            .map(|row: PgRow| OrderShort {
+                id: row.get::<i32, _>("id"),
+                date_created: || -> String {
+
+                    let date_created = row.get::<NaiveDateTime, _>("date_created");
+                    let date_created_utc: DateTime<Utc> = DateTime::from_naive_utc_and_offset(date_created, Utc);
+
+                    let now = Utc::now();
+                    let duration = now.signed_duration_since(date_created_utc);
+
+                    match duration {
+                        d if d.num_days() > 0 => date_created.format("%b %d, %Y").to_string(),
+                        d if d.num_hours() > 0 => format!("{} hours ago", d.num_hours()),
+                        d if d.num_minutes() > 0 => format!("{} minutes ago", d.num_minutes()),
+                        d if d.num_seconds() > 0 => format!("{} seconds ago", d.num_seconds()),
+                        _ => "Just now".to_string(),
+                    }
+
+                    // date_created.format("%b %d, %Y").to_string()
+                    // date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
+                }(),
+                status: || -> String {
+                    let status = row.get::<OrderStatus, _>("status");
+                    status.as_str().to_string()
+                }(),
+                total: match row.get::<Decimal, _>("total").to_f32() {
+                    Some(f) => f,
+                    None => 0.00,
+                },
+                customer_name: row.get::<String, _>("customer_name"),
+            })
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(OrderPage {
+            orders,
+            total_pages,
+            current_page: page,
+            total_count: total.0 as i32,
+            per_page,
+        })
     }
 
     pub fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {

@@ -1,5 +1,5 @@
 //
-// Last Modifications: 2024-08-05 22:40:14
+// Last Modifications: 2024-08-09 21:21:50
 //
 
 use crate::types;
@@ -32,33 +32,6 @@ use serde::{
 use serde_json::Value as JsonValue;
 
 use super::frontend::ProductPage;
-
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "order_by", rename_all = "lowercase")]
-#[serde(rename_all = "lowercase")]
-pub enum OrderBy {
-    Date, // default
-    Modified,
-    Id,
-    // Include,
-    Title,
-    // Slug,
-    Price,
-    // Popularity,
-    // Rating,
-}
-
-impl OrderBy {
-    pub fn as_str(&self) -> &str {
-        match self {
-            OrderBy::Date => "date_created",
-            OrderBy::Modified => "date_modified",
-            OrderBy::Id => "id",
-            OrderBy::Title => "name",
-            OrderBy::Price => "price",
-        }
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, EnumIter)]
 #[sqlx(type_name = "status", rename_all = "lowercase")]
@@ -111,13 +84,14 @@ pub enum CatalogVisibility {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ProductParameters {
+pub struct Parameters {
     pub status: Option<Status>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
     pub order: Option<types::Order>,
-    pub order_by: Option<OrderBy>,
+    pub order_by: Option<String>,
     pub featured: Option<bool>,
+    pub category: Option<u32>, // Limit result set to products assigned a specific category ID.
     pub sku: Option<String>, // Limit result set to products with a specific SKU.
     pub exclude: Option<String>, // array - Ensure result set excludes specific IDs.
     pub include: Option<String>, // array - Limit result set to specific ids.
@@ -178,8 +152,25 @@ pub struct Category {
     product_count: i64, // number of products
 }
 
-fn where_clause(parameters: &ProductParameters) -> String {
+pub fn products_order_by(parameter: &Option<String>) -> &str {
+    match parameter.as_ref() {
+        Some(v) => match v.as_str() {
+            "date" => "date_created",
+            "modified" => "date_modified",
+            "id" => "id",
+            // "included" => "?",
+            "title" => "name",
+            // "slug" => "?",
+            "price" => "price",
+            // "popularity" => "?",
+            // "rating" => "?",
+            _ => "date_created", // The default case
+        },
+        None => "date_created",
+    }
+}
 
+fn where_clause_parts(parameters: &Parameters) -> Vec<String> {
     let mut where_parts = Vec::new();
 
     if parameters.status.is_some() {
@@ -219,11 +210,7 @@ fn where_clause(parameters: &ProductParameters) -> String {
             parameters.exclude.as_ref().unwrap().as_str().to_string()));
     }
 
-    if where_parts.is_empty() {
-        "products".to_string()
-    } else {
-        format!("products WHERE {}", where_parts.join(" AND "))
-    }
+    where_parts
 }
 
 pub struct Products {
@@ -277,7 +264,7 @@ impl<'a> Frontend<'a> {
         slug: &str,
         page: i32,
         per_page: i32,
-        order_by: OrderBy,
+        order_by: String,
         order: types::Order) -> Result<Vec<frontend::ProductShort>, anyhow::Error> {
 
         let offset = (page - 1) * per_page;
@@ -482,12 +469,14 @@ impl<'a> Frontend<'a> {
     }
 
     pub async fn get_page(&self,
-        parameters: &ProductParameters) -> Result<frontend::ProductPage, anyhow::Error> {
+        parameters: &Parameters,
+        category_slug: Option<&str>,
+    ) -> Result<frontend::ProductPage, anyhow::Error> {
 
         let per_page = parameters.per_page.unwrap_or(3) as i32;
 
         let order = parameters.order.as_ref().unwrap_or(&types::Order::Desc);
-        let order_by = parameters.order_by.as_ref().unwrap_or(&OrderBy::Date);
+        let order_by = products_order_by(&parameters.order_by);
 
         // println!("{:?}", parameters);
 
@@ -502,9 +491,37 @@ impl<'a> Frontend<'a> {
             .await?;
 
 
-        let from = where_clause(&parameters);
+        let mut where_parts = where_clause_parts(&parameters);
 
-        let total: (i64, ) = sqlx::query_as(&format!(r#"SELECT COUNT(*) FROM {};"#, from))
+        let mut tables = vec!["products"];
+
+        if parameters.category.is_some() || category_slug.is_some() {
+
+            // http://127.0.0.1:8080/product-category/nam-vitae-magna/
+            if parameters.category.is_some() {
+                where_parts.push(format!("product_categories.category_id={} AND product_categories.product_id=products.id",
+                    parameters.category.unwrap()));
+            }
+
+            // http://127.0.0.1:8080/product-category/nam-vitae-magna/?category=1
+            if category_slug.is_some() {
+                let slug = category_slug.unwrap();
+                where_parts.push(format!("categories.slug='{}' AND categories.id=product_categories.category_id AND product_categories.product_id=products.id", slug));
+                tables.push("categories");
+            };
+
+            tables.push("product_categories");
+        }
+
+        let from = if where_parts.is_empty() {
+            "products".to_string()
+        } else {
+            format!("{} WHERE {}", tables.join(", "), where_parts.join(" AND "))
+        };
+
+        let total: (i64, ) = sqlx::query_as(&format!(r#"
+            SELECT COUNT(*) FROM {};
+        "#, from))
             .fetch_one(self.pool)
             .await?;
 
@@ -552,7 +569,7 @@ impl<'a> Frontend<'a> {
             ORDER BY
                 products.{} {}
             LIMIT $1 OFFSET $2;
-        "#, from, order_by.as_str(), order.as_str()))
+        "#, from, order_by, order.as_str()))
             .bind(per_page)
             .bind(offset)
             .map(|row: PgRow| frontend::ProductShort {
@@ -677,7 +694,10 @@ impl<'a> Backend<'a> {
         Ok(media_row.0)
     }
 
-    pub async fn delete_categories(&self, product_id: i32) -> Result<(), anyhow::Error> {
+    pub async fn delete_categories(&self,
+        product_id: i32,
+    ) -> Result<(), anyhow::Error> {
+
         sqlx::query(r#"
             DELETE FROM product_categories WHERE product_id = $1;
         "#)
@@ -903,7 +923,9 @@ impl<'a> Backend<'a> {
         })
     }
 
-    pub async fn add(&self, product: &backend::Product) -> Result<i32, anyhow::Error> {
+    pub async fn add(&self,
+        product: &backend::Product,
+    ) -> Result<i32, anyhow::Error> {
         // Implementation to add a new product
 
         let product_id: i32 = sqlx::query(r#"
@@ -954,14 +976,21 @@ impl<'a> Backend<'a> {
     }
 
     pub async fn get_page(&self,
-        parameters: &ProductParameters) -> Result<backend::ProductPage, anyhow::Error> {
+        parameters: &Parameters,
+    ) -> Result<backend::ProductPage, anyhow::Error> {
 
         let per_page = parameters.per_page.unwrap_or(3) as i32;
 
         let order = parameters.order.as_ref().unwrap_or(&types::Order::Asc);
-        let order_by = parameters.order_by.as_ref().unwrap_or(&OrderBy::Date);
+        let order_by = products_order_by(&parameters.order_by);
 
-        let from = where_clause(&parameters);
+        let where_parts = where_clause_parts(&parameters);
+
+        let from = if where_parts.is_empty() {
+            "products".to_string()
+        } else {
+            format!("products WHERE {}", where_parts.join(" AND "))
+        };
 
         let total: (i64, ) = sqlx::query_as(&format!(r#"
             SELECT 
@@ -1011,7 +1040,7 @@ impl<'a> Backend<'a> {
             ORDER BY 
                 products.{} {}
             LIMIT $1 OFFSET $2;
-        "#, order_by.as_str(), order.as_str()))
+        "#, order_by, order.as_str()))
             .bind(per_page)
             .bind(offset)
             .map(|row: PgRow| backend::ProductShort {

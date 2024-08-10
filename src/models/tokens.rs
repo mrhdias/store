@@ -1,8 +1,8 @@
 //
-// Last Modification: 2024-07-22 19:01:34
+// Last Modification: 2024-08-09 22:39:40
 //
 
-use crate::models::users::UserRoles;
+use crate::models::users;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc, Duration};
 use uuid::Uuid;
@@ -26,7 +26,7 @@ impl Tokens {
         Ok(())
     }
 
-    pub async fn is_valid(&self, token: &str) -> Result<UserRoles, anyhow::Error> {
+    pub async fn is_valid(&self, token: &str) -> Result<users::UserRoles, anyhow::Error> {
         let row = sqlx::query(r#"
             SELECT tokens.user_id, tokens.expires, users.role FROM tokens, users WHERE token = $1;
         "#)
@@ -36,7 +36,7 @@ impl Tokens {
 
         println!("TOKEN IS VALID: {}", token);
 
-        let role = row.get::<UserRoles, _>("role");
+        let role = row.get::<users::UserRoles, _>("role");
         let expires = row.get::<NaiveDateTime, _>("expires");
         
         // let expires_utc: DateTime<Utc> = DateTime::from_utc(expires, Utc);

@@ -93,9 +93,11 @@ CREATE TABLE categories (
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     parent INTEGER NOT NULL DEFAULT 0,
+    description VARCHAR(512) NOT NULL DEFAULT '',
     UNIQUE(id, slug)
 );
 
+-- A product can have multiple categories
 CREATE TABLE product_categories (
     product_id INT REFERENCES products(id) ON DELETE CASCADE,
     category_id INT REFERENCES categories(id) ON DELETE CASCADE,

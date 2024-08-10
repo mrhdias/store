@@ -1,10 +1,12 @@
 //
-// Last Modification: 2024-07-22 18:39:38
+// Last Modification: 2024-08-08 19:50:48
 //
 
 // https://woocommerce.com/document/woocommerce-shortcodes/products/
 // [products limit="4" columns="4" orderby="popularity" class="quick-sale" on_sale="true" ]
 // products(limit=4, order="DESC", skus="6756443,6543237", ids="1,2,3,4,5,6,7")
+
+use std::collections::HashMap;
 
 use axum::{
     extract::{Extension, Query},
@@ -13,13 +15,17 @@ use axum::{
 
 use tera::{
     Tera,
-    Context
+    Context,
+    Function,
+    Result,
+    Value,
 };
 
 use serde::{
     Serialize,
     Deserialize
 };
+use serde_json::{from_value, to_value};
 
 use crate::types;
 use crate::models::products;
@@ -111,3 +117,44 @@ pub async fn products(
     Html(rendered)
 }
 
+
+// tera.register_function("shortcode", make_shortcode());
+// {{ shortcode(display="products", limit="4", columns="4", orderby="popularity", class="quick-sale", on_sale="true") | safe }}
+
+fn shortcode_products(args: &HashMap<String, Value>) -> String {
+    let mut attributes = vec![];
+
+    let swap = match args.get("swap") {
+        Some(v) => to_value(&v).unwrap().to_string(),
+        None => "outer".to_string(),
+    };
+
+    for attribute in ["limit", "ids", "skus", "on_sale", "order", "orderby"] {
+        if let Some(v) = args.get(attribute) {
+            let v = to_value(v).unwrap();
+            attributes.push(format!("{}={}", attribute, from_value::<String>(v).unwrap()));
+        }
+    }
+
+    format!("<div data-swap=\"{}\" data-shortcode=\"{}\"></div>", swap, if attributes.is_empty() {
+        "/shortcode/products".to_string()
+    } else {
+        format!("/shortcode/products?{}", attributes.join("&"))
+    })
+}
+
+pub fn make_shortcode() -> impl Function {
+    Box::new(move |args: &HashMap<String, Value>| -> Result<Value> {
+
+        let display = args.get("display");
+        if display.is_none() {
+            return Err(tera::Error::msg(format!("display must be specified for shortcode")));
+        }
+        let display_name = &from_value::<String>(to_value(display.unwrap()).unwrap()).unwrap();
+
+        match display_name.as_ref() {
+            "products" => Ok(shortcode_products(args).into()),
+            _ => Err(tera::Error::msg(format!("Unknown shortcode display name: {}", display_name))),
+        }
+    })
+}

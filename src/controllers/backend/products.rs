@@ -1,22 +1,21 @@
 //
-// Last Modification: 2024-08-03 18:40:03
+// Last Modification: 2024-08-09 21:24:24
 //
 
 use crate::utils;
-
 use crate::models;
 use crate::models::products;
 use crate::models::categories;
 
 use anyhow;
 use slug::slugify;
-use std::collections::HashMap;
 
 use std::{
     fs,
     fs::File,
     io::Write,
     path::PathBuf,
+    collections::HashMap,
 };
 
 use strum::IntoEnumIterator;
@@ -445,7 +444,9 @@ pub async fn handle(
     let categories_manager = categories::Categories::new(pool);
 
     if !category_name.is_empty() {
-        let category_id = match categories_manager.add(&category_name, parent_category).await {
+        let category_id = match categories_manager
+            .backend()
+            .add(&category_name, parent_category).await {
             Ok(id) => id,
             Err(e) => {
                 eprintln!("Error: {}", e);
@@ -512,7 +513,7 @@ pub async fn handle(
         status_names.push(status.as_str().to_string());
     }
 
-    let categories = match categories_manager.get_all().await {
+    let categories = match categories_manager.backend().get_all().await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -580,7 +581,7 @@ pub async fn edit(
         Ok(product) => {
 
             let categories_manager = categories::Categories::new(pool);
-            let categories = match categories_manager.get_all().await {
+            let categories = match categories_manager.backend().get_all().await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("Error: {}", e);
@@ -643,7 +644,7 @@ pub async fn new(
     };
 
     let categories_manager = categories::Categories::new(pool);
-    let categories = match categories_manager.get_all().await {
+    let categories = match categories_manager.backend().get_all().await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -667,65 +668,8 @@ pub async fn new(
     Html(rendered)
 }
 
-/*
-pub async fn old_list(
-    Query(parameters): Query<products::ProductParameters>,
-    Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
-
-    let products_manager = products::Products::new(pool).await;
-
-    let total_count = products_manager
-        .backend()
-        .count_all()
-        .await
-        .unwrap_or(0);
-
-    let per_page = parameters.per_page.unwrap_or(3);
-
-    let total_pages: i32 = (total_count as f32 / per_page as f32).ceil() as i32;
-
-    let mut page = parameters.page.unwrap_or(1) as i32;
-    if page > total_pages {
-        page = total_pages;
-    } else if page == 0 {
-        page = 1;
-    }
-
-    let products = if total_count > 0 {
-        match products_manager.backend().get_all(
-            page, 
-            per_page as i32,
-            parameters.order_by.unwrap_or(products::OrderBy::Date),
-            parameters.order.unwrap_or(types::Order::Desc)
-        ).await {
-            Ok(products) => products,
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                return Html("An error occurred while fetching products.".to_string());
-            },
-        }
-    } else {
-        vec![]
-    };
-
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
-
-    let mut data = Context::new();
-    data.insert("partial", "products");
-    data.insert("products", &products);
-    data.insert("current_page", &page);
-    data.insert("total_products", &total_count);
-    data.insert("per_page", &per_page);
-    data.insert("total_pages", &total_pages);
-
-    let rendered = tera.render("backend/admin.html", &data).unwrap();
-    Html(rendered)
-}
-*/
-
 pub async fn list(
-    Query(parameters): Query<products::ProductParameters>,
+    Query(parameters): Query<products::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 

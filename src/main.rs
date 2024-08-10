@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-07-30 23:12:33
+// Last Modified: 2024-08-09 22:54:52
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -172,19 +172,25 @@ async fn main() {
 
     // build our application with a single route
     let app = Router::new()
-        .route("/admin/orders/new", get(controllers::backend::orders::new))
-        .route("/admin/orders/:id", get(controllers::backend::orders::edit))
-        .route("/admin/orders", get(controllers::backend::orders::list))
         .route("/admin/media", get(controllers::backend::media::library))
-        // admin products
         // .route("/admin/products/:id/media/update", post(admin::products::media::update))
         // .route("/admin/products/:id/media/add", post(admin::products::media::add))
         // .route("/admin/products/:id/media", post(admin::products::media::select))
+        // backend orders
+        .route("/admin/orders/new", get(controllers::backend::orders::new))
+        .route("/admin/orders/:id", get(controllers::backend::orders::edit))
+        .route("/admin/orders", get(controllers::backend::orders::list))
+        // backend categories
+        .route("/admin/categories/new", get(controllers::backend::categories::new))
+        .route("/admin/categories/:id", get(controllers::backend::categories::edit))
         .route("/admin/categories", get(controllers::backend::categories::list))
+        // backend products
         .route("/admin/products/:id", get(controllers::backend::products::edit)
             .post(controllers::backend::products::handle))
         .route("/admin/products/new", get(controllers::backend::products::new))
         .route("/admin/products", get(controllers::backend::products::list))
+        // backend users
+        .route("/admin/users/new", get(controllers::backend::users::new))
         .route("/admin/users/:id", get(controllers::backend::users::edit))
         .route("/admin/users", get(controllers::backend::users::list))
         // admin

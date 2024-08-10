@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Store</title>
-    <link rel="stylesheet" href="/assets/css/store.css?v=2024072801">
+    <link rel="stylesheet" href="/assets/css/frontend.css?v=2024080901">
     <style>
+a {
+    text-decoration: none;
+}
+
 .content {
     display: flex;
     gap: 10px;
@@ -13,14 +17,7 @@
     flex-direction: column;
     align-items: flex-end;
 }
-/*
-.pagination {
-    display: flex;
-    flex-direction: row;
-    gap: 5px;
-    align-items: center;
-}
-*/
+
 .pagination {
     display: flex;
     flex-direction: row;
@@ -45,6 +42,10 @@
 
 .pagination > li.current_page > a {
     background-color: #9e9e9e;
+}
+
+.pagination > li > a:hover {
+    background-color: #acacac;
 }
 
 .box {
@@ -128,7 +129,7 @@
             </div>
             {% endif %}
 
-            <form id="product-filter" method="get" action="{{path}}">
+            <form id="product-filter" method="get" action="{{ path }}">
                 <div class="box">
                     <h3 class="title">Price: <span id="price-range-status" style="font-weight: normal; font-size: 14px;">{% if min_price < 0 and max_price < 0 %}Off{% else %}On{% endif %}</span></h3>
                     <div>
@@ -172,7 +173,7 @@
             <div style="display: flex; gap: 10px;">
                 <span style="background-color: #b0bec5;padding: 2px 6px;border-radius: 5px;font-size: 14px;">{{ total_products }} items</span>
                 {% if products | length > 1  %}
-                <form id="sort-products" method="get" action="{{path}}">
+                <form id="sort-products" method="get" action="{{ path }}">
                     <input type="hidden" name="min_price" value="{{ min_price | round(method='floor') }}">
                     <input type="hidden" name="max_price" value="{{ max_price | round }}">
                     <input type="hidden" name="on_sale" value="{{ on_sale }}">
@@ -228,15 +229,15 @@
                     {% set next_page = current_page %}
                 {% endif %}
                 <div style="display: flex;gap: 10px;margin-top: 20px;width: 100%;justify-content: center;">
-                    <a href="{{path}}?page={{ previous_page }}{% if query != '' %}&{{ query }}{% endif %}">‹</a>
+                    <a href="{{ path }}?page={{ previous_page }}{% if query != '' %}&{{ query }}{% endif %}">‹</a>
                     <ul class="pagination">
                     {% for page in range(end=total_pages) %}
                         <li {% if current_page == page + 1 %}class="current_page"{% endif %}>
-                            <a href="{{path}}?page={{ page + 1 }}{% if query != '' %}&{{ query }}{% endif %}">{{ page + 1 }}</a>
+                            <a href="{{ path }}?page={{ page + 1 }}{% if query != '' %}&{{ query }}{% endif %}">{{ page + 1 }}</a>
                         </li>
                     {% endfor %}
                     </ul>
-                    <a href="{{path}}?page={{ next_page }}{% if query != '' %}&{{ query }}{% endif %}">›</a>
+                    <a href="{{ path }}?page={{ next_page }}{% if query != '' %}&{{ query }}{% endif %}">›</a>
                 </div>
             {% endif %}
 

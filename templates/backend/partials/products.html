@@ -1,108 +1,66 @@
+{% import "backend/macros.html" as macros %}
 <style>
-.pagination {
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
-    flex-direction: row;
-    align-items: center;
-    padding-bottom: 10px;
-}
-
-table.admin.product-list {
-    table-layout: fixed;
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid #c3c4c7;
-}
-
-.admin.product-list thead {
-    border: 1px solid #c3c4c7;
-    background-color: #fff;
-}
-
-.admin.product-list th:first-child,td:first-child {
-    width: 20px;
-}
-
-.admin.product-list th:nth-child(2),td:nth-child(2) {
-    width: 50px;
-    text-align: center;
-}
-
-.admin.product-list th,td {
-    text-align: left;
-    padding: 4px 10px;
-}
-
-.admin.product-list td {
-    vertical-align: top;
-}
-
-.admin.product-list a {
-    display: inline-block;
-}
-
-
-.admin.product-list img {
+table.list-items img {
     display: block;
     max-width: 40px;
     max-height: 40px;
 }
 
-.admin.product-list .row-title {
+table.list-items .thumbnail {
+    text-align: center;
+    width: 50px;
+}
+
+table.list-items .thumbnail > img {
+    display: block;
+    max-width: 40px;
+    max-height: 40px;
+}
+
+table.list-items .name {
     font-weight: bold;
     text-decoration: none;
 }
 
-.admin.product-list .stock {
+table.list-items .stock {
     font-weight: bold;
 }
 
-.admin.product-list .stock.instock {
+table.list-items .stock.instock {
     color: green;
 }
 
-.admin.product-list .stock.outofstock {
+table.list-items .stock.outofstock {
     color: red;
 }
 
-.admin.product-list .stock.backorder {
+table.list-items .stock.backorder {
     color: gray;
+}
+
+table.list-items .price {
+    display: flex;
+    flex-direction: column;
+}
+
+table.list-items .price > .on-sale {
+    text-decoration: line-through;
+    font-size: 0.95em;
 }
 </style>
 
-<a href="/admin/products/new" style="display: inline-block;text-decoration: none; padding: 4px 6px; border: 1px solid #c3c4c7;margin-bottom: 4px;">Add New</a>
+<a href="/admin/products/new" class="add-new-item-btn">Add New</a>
 
 {% if products | length == 0 %}
     <span class="alert">The product catalog is empty!</span>
 {% else %}
 
-    {% if total_pages > 1 %}
-        {% set previous_page = current_page - 1 %}
-        {% if previous_page == 0 %}
-            {% set previous_page = 1 %}
-        {% endif %}
-        {% set next_page = current_page + 1 %}
-        {% if next_page > total_pages %}
-            {% set next_page = current_page %}
-        {% endif %}
-    <div class="pagination">
-        <span>{{ total_products }} items</span>
-        <a href="/admin/products?page=1">«</a>
-        <a href="/admin/products?page={{ previous_page }}">‹</a>
-        <form id="pagination" method="get" action="/admin/products">
-            <input type="number" name="page" value="{{ current_page }}" min="1" max="{{ total_pages }}">
-        </form>
-        <span>of {{ total_pages }}</span>
-        <a href="/admin/products?page={{ next_page }}">›</a>
-        <a href="/admin/products?page={{ total_pages }}">»</a>
-    </div>
-    {% endif %}
+    {{ macros::backend_pagination(url="/admin/products", total=total_products) }}
 
-    <table class="admin product-list">
+    <table class="list-items products">
         <thead>
             <th><input type="checkbox"></th>
-            <th>
+            <th class="thumbnail">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                     <path fill="black" d="M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86l-3 3.87L9 13.14L6 17h12z"/>
                 </svg>
@@ -117,8 +75,8 @@ table.admin.product-list {
             {% for product in products %}
             <tr>
                 <td><input type="checkbox"></td>
-                <td><a href="/admin/products/{{ product.id }}"><img src="{{ product.image_src }}" alt="{{ product.image_alt }}"></a></td>
-                <td><a class="row-title" href="/admin/products/{{ product.id }}">{{ product.name }}</a></td>
+                <td class="thumbnail"><a href="/admin/products/{{ product.id }}"><img src="{{ product.image_src }}" alt="{{ product.image_alt }}"></a></td>
+                <td class="name"><a class="row-title" href="/admin/products/{{ product.id }}">{{ product.name }}</a></td>
                 <td>{{ product.sku }}</td>
                 <td>{% if product.stock_status == "instock" %}
                     <span class="stock instock">In stock</span>
@@ -129,8 +87,8 @@ table.admin.product-list {
                     {% endif %}
                     ({{ product.stock_quantity }})
                 </td>
-                <td style="display: flex; flex-direction: column;">
-                    <span {% if product.on_sale %}style="text-decoration:line-through;font-size:0.95em;"{% endif %}>{{ product.regular_price | round_and_format(places=2) }} €</span>
+                <td class="price">
+                    <span {% if product.on_sale %}class="on-sale"{% endif %}>{{ product.regular_price | round_and_format(places=2) }} €</span>
                     {% if product.on_sale %}
                         <span>{{ product.sale_price | round_and_format(places=2) }} €<span>
                     {% endif %}

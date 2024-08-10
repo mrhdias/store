@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-08-02 22:10:32
+// Last Modification: 2024-08-08 19:25:58
 //
 
 use tera::{Result, Value};
@@ -14,6 +14,4 @@ pub fn round_and_format_filter(value: &Value, params: &HashMap<String, Value>) -
     Ok(Value::String(format!("{:.1$}", num, decimal_places as usize)))
 }
 
-pub fn round_to_two_decimal_places(value: &f32) -> f32 {
-    (value * 100.00).round() / 100.0
-}
+

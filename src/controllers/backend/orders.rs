@@ -1,13 +1,11 @@
 //
 // Description: List all orders
-// Last Modification: 2024-07-30 18:46:35
+// Last Modification: 2024-08-09 21:23:32
 //
 
-use crate::models::orders::Parameters;
+use crate::models::orders;
 use crate::types;
 use crate::utils;
-use crate::models::orders;
-
 
 use axum::{
     extract::{Extension, Path, Query},
@@ -34,8 +32,9 @@ pub async fn edit(
     Html("Edit order unimplemented".to_string())
 }
 
+/*
 pub async fn list(
-    Query(parameters): Query<Parameters>,
+    Query(parameters): Query<orders::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
@@ -82,9 +81,43 @@ pub async fn list(
     data.insert("partial", "orders");
     data.insert("orders", &orders);
     data.insert("current_page", &page);
-    data.insert("total_products", &total_count);
+    data.insert("total_orders", &total_count);
     data.insert("per_page", &per_page);
     data.insert("total_pages", &total_pages);
+    let rendered = tera.render("backend/admin.html", &data).unwrap();
+    Html(rendered)
+
+}
+*/
+
+pub async fn list(
+    Query(parameters): Query<orders::Parameters>,
+    Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
+    Extension(mut tera): Extension<Tera>,
+) -> Html<String> {
+
+    let orders_manager = orders::Orders::new(pool);
+
+    let page = match orders_manager
+        .get_page(&parameters)
+        .await {
+        Ok(page) => page,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return Html("An error happened while fetching orders".to_string());
+        },
+    };
+
+    tera.register_filter("round_and_format", utils::round_and_format_filter);
+
+    let mut data = Context::new();
+    data.insert("partial", "orders");
+    data.insert("orders", &page.orders);
+    data.insert("current_page", &page.current_page);
+    data.insert("total_orders", &page.total_count);
+    data.insert("per_page", &page.per_page);
+    data.insert("total_pages", &page.total_pages);
+
     let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)
 

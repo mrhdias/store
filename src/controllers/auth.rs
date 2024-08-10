@@ -1,8 +1,8 @@
 //
-// Last Modification: 2024-07-26 19:37:54
+// Last Modification: 2024-08-09 22:39:55
 //
 
-use crate::models::users::UserRoles;
+use crate::models::users;
 use crate::models::tokens;
 use anyhow::Result;
 
@@ -16,7 +16,7 @@ use tera::{Tera, Context};
 use std::collections::HashMap;
 
 pub struct RequireAuth {
-    pub role: UserRoles,
+    pub role: users::UserRoles,
 }
 
 #[axum::async_trait]
@@ -38,7 +38,7 @@ where
             .expect("Missing PgPool");
 
         println!("parts {:?}", parts);
-        println!("headers {:?}", parts.headers);
+        // println!("headers {:?}", parts.headers);
 
         let mut cookies = HashMap::new();
 
@@ -55,8 +55,6 @@ where
                 }
             }
         }
-
-        // println!("Cookies {:?}", cookies);
 
         if let Some(token) = cookies.get("token") {
             // println!("token: {}", token);

@@ -1,36 +1,7 @@
+{% import "backend/macros.html" as macros %}
 <style>
-.pagination {
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
-    flex-direction: row;
-    align-items: center;
-    padding-bottom: 10px;
-}
-
-table.admin.order-list {
-    table-layout: fixed;
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid #c3c4c7;
-}
-
-.admin.order-list thead {
-    border: 1px solid #c3c4c7;
-    background-color: #fff;
-}
-
-.admin.order-list th:first-child,td:first-child {
-    width: 20px;
-}
-
-.admin.order-list th,td {
-    text-align: left;
-    padding: 4px 10px;
-}
-
-.admin.order-list td {
-    vertical-align: top;
+.list-items .total {
+    text-align: right;
 }
 
 .badge-status {
@@ -46,43 +17,22 @@ table.admin.order-list {
 .badge-on-hold {
     background-color: #ffe082;
 }
-
 </style>
 
-<a href="/admin/orders/new" style="display: inline-block;text-decoration: none; padding: 4px 6px; border: 1px solid #c3c4c7;margin-bottom: 4px;">Add New</a>
+<a href="/admin/orders/new" class="add-new-item-btn">Add New</a>
 
 {% if orders | length == 0 %}
     <span class="alert">There are no orders to process!</span>
 {% else %}
-    {% if total_pages > 1 %}
-        {% set previous_page = current_page - 1 %}
-        {% if previous_page == 0 %}
-            {% set previous_page = 1 %}
-        {% endif %}
-        {% set next_page = current_page + 1 %}
-        {% if next_page > total_pages %}
-            {% set next_page = current_page %}
-        {% endif %}
-    <div class="pagination">
-        <span>{{ total_products }} items</span>
-        <a href="/admin/orders?page=1">«</a>
-        <a href="/admin/orders?page={{ previous_page }}">‹</a>
-        <form id="pagination" method="get" action="/admin/orders">
-            <input type="number" name="page" value="{{ current_page }}" min="1" max="{{ total_pages }}">
-        </form>
-        <span>of {{ total_pages }}</span>
-        <a href="/admin/orders?page={{ next_page }}">›</a>
-        <a href="/admin/orders?page={{ total_pages }}">»</a>
-    </div>
-    {% endif %}
+    {{ macros::backend_pagination(url="/admin/orders", total=total_orders) }}
 
-    <table class="admin order-list">
+    <table class="list-items orders">
         <thead>
             <th><input type="checkbox"></th>
             <th>Order</th>
             <th>Date</th>
             <th>Customer</th>
-            <th style="text-align: right;">Total</th>
+            <th class="total">Total</th>
             <th>Status</th>
         </thead>
         <tbody>
@@ -92,7 +42,7 @@ table.admin.order-list {
                 <td><a href="/admin/orders/{{ order.id }}">#{{ order.id }}</a></td>
                 <td>{{ order.date_created }}</td>
                 <td>{{ order.customer_name }}</td>
-                <td style="text-align: right;">{{ order.total | round_and_format(places=2) }} €</td>
+                <td class="total">{{ order.total | round_and_format(places=2) }} €</td>
                 <td><span class="badge-status badge-{{ order.status | lower }}">{{ order.status | capitalize }}</span></td>
             </tr>
             {% endfor %}

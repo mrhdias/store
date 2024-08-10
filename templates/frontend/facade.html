@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home</title>
-    <link rel="stylesheet" href="assets/css/store.css?v=2024072701">
+    <link rel="stylesheet" href="assets/css/frontend.css?v=2024080901">
 </head>
 <body>
     {% include 'frontend/partials/header.html' %}
 
     <main>
-        <div data-swap="outer" data-shortcode="/shortcode/products?limit=4"></div>
+        {{ shortcode(display="products", limit="4") | safe }}
     </main>
 
     {% include 'frontend/partials/footer.html' %}
