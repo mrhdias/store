@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-08-09 22:54:52
+// Last Modified: 2024-08-12 21:26:09
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -47,7 +47,7 @@ use tower_http::{
 
 use tower_sessions::{
     Expiry,
-    SessionManagerLayer
+    SessionManagerLayer,
 };
 use tower_sessions_sqlx_store::PostgresStore;
 
@@ -56,7 +56,16 @@ use tera::{
     Context
 };
 
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{
+    postgres::{
+        PgConnectOptions,
+        PgPoolOptions,
+    },
+    Executor,
+    Pool,
+    Postgres,
+    Error,
+};
 
 use serde::{
     Deserialize,
@@ -83,7 +92,8 @@ struct DatabaseConf {
 async fn autentication(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(tera): Extension<Tera>,
-    Form(payload): Form<LoginForm>) -> (StatusCode, HeaderMap, Html<String>) {
+    Form(payload): Form<LoginForm>,
+) -> (StatusCode, HeaderMap, Html<String>) {
 
     let user = models::users::Users::new(pool.clone());
 
@@ -129,6 +139,21 @@ async fn autentication(
     (StatusCode::OK, HeaderMap::new(), Html(rendered))
 }
 
+async fn is_database_empty(pool: &Pool<Postgres>) -> Result<bool, Error> {
+    let row: (i64,) = sqlx::query_as(
+        r#"
+        SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            AND table_type = 'BASE TABLE';
+        "#,
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(row.0 == 0)
+}
+
 #[tokio::main]
 async fn main() {
 
@@ -141,15 +166,34 @@ async fn main() {
         }
     };
 
+    let options = PgConnectOptions::new()
+        .host(&db_conf.host)
+        .username(&db_conf.user)
+        .password(&db_conf.password)
+        .database(&db_conf.name)
+        .to_owned();
+
     let pool = PgPoolOptions::new()
         .max_connections(db_conf.max_connections)
-        .connect(&format!("postgres://{}:{}@{}/{}",
-            db_conf.user,
-            db_conf.password,
-            db_conf.host,
-            db_conf.name))
+        .connect_with(options)
         .await
         .expect("Failed to make connection pool! Please check if the PostgreSQL server is running and try again");
+
+    match is_database_empty(&pool).await {
+        Ok(true) => {
+            println!("Database is empty, applying schema migration");
+            match pool.execute(include_str!("../db/schema.sql")).await {
+                Ok(_) => println!("Database schema migration successful"),
+                Err(e) => {
+                    panic!("Error during schema migration: {}", e);
+                }
+            }
+        },
+        Ok(false) => println!("Database is not empty, skipping schema migration"),
+        Err(e) => {
+            panic!("Error checking database schema: {}", e);
+        }
+    };
 
     // https://github.com/maxcountryman/tower-sessions
     // => \dt *.*
@@ -170,35 +214,37 @@ async fn main() {
 
     let tera = Tera::new("templates/**/*").unwrap();
 
-    // build our application with a single route
-    let app = Router::new()
-        .route("/admin/media", get(controllers::backend::media::library))
-        // .route("/admin/products/:id/media/update", post(admin::products::media::update))
-        // .route("/admin/products/:id/media/add", post(admin::products::media::add))
-        // .route("/admin/products/:id/media", post(admin::products::media::select))
+    let admin_router = Router::new()
+        .route("/media", get(controllers::backend::media::library))
+        // .route("/products/:id/media/update", post(admin::products::media::update))
+        // .route("/products/:id/media/add", post(admin::products::media::add))
+        // .route("/products/:id/media", post(admin::products::media::select))
         // backend orders
-        .route("/admin/orders/new", get(controllers::backend::orders::new))
-        .route("/admin/orders/:id", get(controllers::backend::orders::edit))
-        .route("/admin/orders", get(controllers::backend::orders::list))
+        .route("/orders/new", get(controllers::backend::orders::new))
+        .route("/orders/:id", get(controllers::backend::orders::edit))
+        .route("/orders", get(controllers::backend::orders::list))
         // backend categories
-        .route("/admin/categories/new", get(controllers::backend::categories::new))
-        .route("/admin/categories/:id", get(controllers::backend::categories::edit))
-        .route("/admin/categories", get(controllers::backend::categories::list))
+        .route("/categories/new", get(controllers::backend::categories::new))
+        .route("/categories/:id", get(controllers::backend::categories::edit))
+        .route("/categories", get(controllers::backend::categories::list))
         // backend products
-        .route("/admin/products/:id", get(controllers::backend::products::edit)
+        .route("/products/:id", get(controllers::backend::products::edit)
             .post(controllers::backend::products::handle))
-        .route("/admin/products/new", get(controllers::backend::products::new))
-        .route("/admin/products", get(controllers::backend::products::list))
+        .route("/products/new", get(controllers::backend::products::new))
+        .route("/products", get(controllers::backend::products::list))
         // backend users
-        .route("/admin/users/new", get(controllers::backend::users::new))
-        .route("/admin/users/:id", get(controllers::backend::users::edit))
-        .route("/admin/users", get(controllers::backend::users::list))
+        .route("/users/new", get(controllers::backend::users::new))
+        .route("/users/:id", get(controllers::backend::users::edit))
+        .route("/users", get(controllers::backend::users::list))
         // admin
-        .route("/admin/sidebar", get(controllers::admin::sidebar))
-        .route("/admin", get(controllers::admin::dashboard))
+        .route("/sidebar", get(controllers::admin::sidebar))
+        .route("/", get(controllers::admin::dashboard));
+
+    let app = Router::new()
+        .nest("/admin", admin_router)
         .route_layer(from_extractor::<controllers::auth::RequireAuth>())
         .route("/", get(controllers::storefront::facade))
-        .route("/test", get(|| async { "Hello, World!" }))
+        // .route("/test", get(|| async { "Hello, World!" }))
         .route("/login", get(controllers::auth::login)
             .post(autentication))
         .route("/checkout", get(controllers::frontend::checkout::show)
@@ -223,6 +269,7 @@ async fn main() {
         .await
         .unwrap();
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))
+        // .with_graceful_shutdown(async {})
         .await
         .unwrap();
 
