@@ -1,15 +1,19 @@
 //
-// Last Modification: 2024-08-01 18:41:41
+// Last Modification: 2024-08-14 19:19:01
 //
 
 use crate::models::products::StockStatus;
 use crate::models::products::Status;
 use crate::models::products::ProductImage;
 
+use sqlx::types::Json;
+
 use serde::{
     Serialize,
     Deserialize
 };
+
+use super::media;
 
 // Products
 
@@ -75,6 +79,27 @@ impl ProductPage {
 
 // Categories
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Category {
+    pub id: i32,
+    pub name: String,
+    pub slug: String,
+    pub parent: i32,
+    pub description: String,
+    pub image: Json<media::Media>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct CategoryTree {
+    id: i32,
+    name: String,
+    slug: String,
+    parent: i32,
+    path: String,
+    has_childs: bool, // if has childs
+    branches: i32, // number of branches in the tree
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CategoryShort {
     pub id: i32,
@@ -82,6 +107,9 @@ pub struct CategoryShort {
     pub slug: String,
     pub parent: i32,
     pub description: String,
+    pub image: Json<media::Media>,
+    pub has_childs: bool, // if has childs
+    pub branches: i32, // number of branches in the tree
     pub count: i32,
 }
 

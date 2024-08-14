@@ -1,20 +1,21 @@
 //
-// Last Modification: 2024-08-09 22:41:14
+// Last Modification: 2024-08-14 19:17:46
 //
 
 use crate::types;
 use crate::models::backend;
+use crate::models::media;
+
+use anyhow::Ok;
 use slug::slugify;
 
 use sqlx::{
     postgres::PgRow,
     Row,
+    types::Json,
 };
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Parameters {
@@ -29,17 +30,6 @@ pub struct Parameters {
     pub slug: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Category {
-    id: i32,
-    name: String,
-    slug: String,
-    parent: i32,
-    path: String,
-    has_childs: bool, // if has childs
-    branches: i32, // number of branches in the tree
-}
-
 fn categories_order_by(parameter: &Option<String>) -> &str {
     match parameter.as_ref() {
         Some(v) => match v.as_str() {
@@ -50,9 +40,9 @@ fn categories_order_by(parameter: &Option<String>) -> &str {
             // "term_group" => "?",
             // "description" => "?",
             // "count" => "?",
-            _ => "name", // The default case
+            _ => "path", // The default case
         },
-        None => "name",
+        None => "path",
     }
 }
 
@@ -99,11 +89,11 @@ pub struct Backend<'a> {
 
 impl<'a> Backend<'a> {
 
-    pub async fn get_all(&self) -> Result<Vec<Category>, anyhow::Error> {
+    pub async fn get_tree(&self) -> Result<Vec<backend::CategoryTree>, anyhow::Error> {
         // Implementation to get categories
     
         // Execute the query and fetch the results
-        let categories: Vec<Category> = sqlx::query_as::<_, Category>(r#"
+        let categories: Vec<backend::CategoryTree> = sqlx::query_as::<_, backend::CategoryTree>(r#"
             WITH RECURSIVE category_tree AS (
                 SELECT id, name, slug, parent, name::VARCHAR AS path, EXISTS(SELECT 1 FROM categories c2 WHERE c2.parent = c.id) AS has_childs, 1 AS branches FROM categories c WHERE parent = 0
                 UNION ALL
@@ -136,6 +126,30 @@ impl<'a> Backend<'a> {
             .get(0);
 
         Ok(category_id)
+    }
+
+    pub async fn get(&self,
+        id: i32,
+    ) -> Result<backend::Category, anyhow::Error> {
+
+        let row = sqlx::query(r#"
+            SELECT
+                name, slug, parent, description, media_id
+            FROM categories WHERE id = $1;
+        "#)
+            .bind(&id)
+            .fetch_one(self.pool)
+            .await?;
+
+
+        Ok(backend::Category{
+            id,
+            name: row.get::<String, _>("name"),
+            slug: row.get::<String, _>("slug"),
+            parent: row.get::<i32, _>("parent"),
+            description: row.get::<String, _>("description"),
+            image: Json(media::Media::default()),
+        })
     }
 
     pub async fn get_page(&self,
@@ -179,12 +193,28 @@ impl<'a> Backend<'a> {
         let offset = (page - 1) * per_page;
 
         let categories = sqlx::query(&format!(r#"
-            SELECT categories.id, categories.name, categories.slug, categories.parent, categories.description, (
-                SELECT COUNT(*) FROM product_categories WHERE product_categories.category_id=categories.id
-            ) AS count
-            FROM categories
-            ORDER BY
-                categories.{} {}
+            WITH RECURSIVE category_tree AS (
+                SELECT id, name, slug, parent, description, media_id, name::VARCHAR AS path,
+                    EXISTS(SELECT 1 FROM categories c2 WHERE c2.parent = c.id) AS has_childs,
+                    1 AS branches FROM categories c WHERE parent = 0
+                UNION ALL
+                SELECT c.id, c.name, c.slug, c.parent, c.description, c.media_id, (ct.path || ' > ' || c.name)::VARCHAR AS path,
+                    EXISTS(SELECT 1 FROM categories c2 WHERE c2.parent = c.id) AS has_childs,
+                    ct.branches + 1 AS branches FROM categories c
+                INNER JOIN category_tree ct ON ct.id = c.parent
+            ),
+            product_count AS (SELECT category_id, COUNT(*) AS count FROM product_categories GROUP BY category_id),
+            category_with_counts AS (
+                SELECT ct.*, COALESCE(pc.count, 0) AS count FROM category_tree ct
+                LEFT JOIN product_count pc ON ct.id = pc.category_id
+            )
+            SELECT id, name, slug, parent, description,
+                COALESCE( (SELECT
+                    jsonb_build_object('id', media.id, 'src', media.src, 'name', media.name, 'alt', media.alt, 'date_created', null, 'date_modified', null)
+                    FROM media WHERE media.id=category_with_counts.media_id LIMIT 1), '{{"id": 0, "src": "../assets/images/placeholder-300x300.png", "name": "Thumbnail", "alt": "Thumbnail"}}') AS image,
+                path, has_childs, branches, count
+            FROM category_with_counts
+                ORDER BY {} {}
             LIMIT $1 OFFSET $2;
         "#, order_by, order.as_str()))
             .bind(per_page)
@@ -200,6 +230,9 @@ impl<'a> Backend<'a> {
                     }
                     desc
                 }(row.get::<String, _>("description")),
+                image: row.get::<Json<media::Media>, _>("image"),
+                has_childs: row.get::<bool, _>("has_childs"),
+                branches: row.get::<i32, _>("branches"),
                 count: row.get::<i64, _>("count") as i32,
             })
             .fetch_all(self.pool)

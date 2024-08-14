@@ -112,6 +112,7 @@ pub async fn list(
 
     let mut data = Context::new();
     data.insert("partial", "orders");
+    data.insert("title", "Orders");
     data.insert("orders", &page.orders);
     data.insert("current_page", &page.current_page);
     data.insert("total_orders", &page.total_count);

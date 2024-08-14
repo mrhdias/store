@@ -107,7 +107,7 @@ a {
                 <ul>
                     <li><a href="/products">All</a></li>
                     {% for category in categories %}
-                        {% if category.product_count == 0 %}
+                        {% if category.count == 0 %}
                         <li title="Without products">
                             {% for _ in range(end=category.branches - 1) %}
                             &nbsp;&nbsp;
@@ -115,7 +115,7 @@ a {
                             {{category.name}}
                         </li>
                         {% else %}
-                        <li title="{{category.product_count}} products">
+                        <li title="{{category.count}} products">
                             <a href="/product-category/{{category.slug}}">
                                 {% for _ in range(end=category.branches - 1) %}
                                 &nbsp;&nbsp;

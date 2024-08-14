@@ -88,12 +88,22 @@ CREATE TABLE products (
     UNIQUE(sku, slug)
 );
 
+CREATE TABLE media (
+    id SERIAL PRIMARY KEY,
+    src VARCHAR(512) NOT NULL,
+    name VARCHAR(512) NOT NULL,
+    alt VARCHAR(255),
+    date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    date_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
     parent INTEGER NOT NULL DEFAULT 0,
     description VARCHAR(512) NOT NULL DEFAULT '',
+    media_id INT REFERENCES media(id),
     UNIQUE(id, slug)
 );
 
@@ -102,15 +112,6 @@ CREATE TABLE product_categories (
     product_id INT REFERENCES products(id) ON DELETE CASCADE,
     category_id INT REFERENCES categories(id) ON DELETE CASCADE,
     UNIQUE(product_id, category_id)
-);
-
-CREATE TABLE media (
-    id SERIAL PRIMARY KEY,
-    src VARCHAR(512) NOT NULL,
-    name VARCHAR(512) NOT NULL,
-    alt VARCHAR(255),
-    date_created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    date_modified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE product_media (

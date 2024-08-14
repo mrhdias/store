@@ -50,6 +50,7 @@ pub async fn list(
 
     let mut data = Context::new();
     data.insert("partial", "users");
+    data.insert("title", "Users");
     data.insert("users", &page.users);
     data.insert("current_page", &page.current_page);
     data.insert("total_users", &page.total_count);

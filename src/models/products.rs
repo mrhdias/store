@@ -1,5 +1,5 @@
 //
-// Last Modifications: 2024-08-09 21:21:50
+// Last Modifications: 2024-08-14 19:18:50
 //
 
 use crate::types;
@@ -149,7 +149,7 @@ pub struct Category {
     path: String,
     has_childs: bool, // if has childs
     branches: i32, // number of branches in the tree
-    product_count: i64, // number of products
+    count: i64, // number of products
 }
 
 pub fn products_order_by(parameter: &Option<String>) -> &str {
@@ -227,7 +227,7 @@ impl Products {
         Frontend::new(&self.pool)
     }
 
-    pub async fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
+    pub fn new(pool: sqlx::Pool<sqlx::Postgres>) -> Self {
         Products {
             pool,
         }
@@ -335,12 +335,12 @@ impl<'a> Frontend<'a> {
                     ct.branches + 1 AS branches FROM categories c
                 INNER JOIN category_tree ct ON ct.id = c.parent
             ),
-            product_counts AS (SELECT category_id, COUNT(*) AS product_count FROM product_categories GROUP BY category_id),
+            product_count AS (SELECT category_id, COUNT(*) AS count FROM product_categories GROUP BY category_id),
             category_with_products AS (
-                SELECT ct.*, COALESCE(pc.product_count, 0) AS product_count FROM category_tree ct
-                LEFT JOIN product_counts pc ON ct.id = pc.category_id
+                SELECT ct.*, COALESCE(pc.count, 0) AS count FROM category_tree ct
+                LEFT JOIN product_count pc ON ct.id = pc.category_id
             )
-            SELECT id, name, slug, parent, path, has_childs, branches, product_count FROM category_with_products ORDER BY path;
+            SELECT id, name, slug, parent, path, has_childs, branches, count FROM category_with_products ORDER BY path;
         "#)
             .fetch_all(self.pool)
             .await?;

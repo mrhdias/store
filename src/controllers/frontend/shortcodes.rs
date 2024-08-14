@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-08-08 19:50:48
+// Last Modification: 2024-08-14 19:44:01
 //
 
 // https://woocommerce.com/document/woocommerce-shortcodes/products/
@@ -104,7 +104,7 @@ pub async fn products(
         None => "name".to_string(),
     };
 
-    let products_manager = products::Products::new(pool).await;
+    let products_manager = products::Products::new(pool);
     let products = products_manager
         .frontend()
         .get_by_parameters(&ids, &skus, 1, per_page, order)

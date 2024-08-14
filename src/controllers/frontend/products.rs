@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-08-09 21:22:46
+// Last Modification: 2024-08-14 19:43:31
 //
 
 use anyhow;
@@ -26,7 +26,7 @@ pub async fn product(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
-    let products_manager = products::Products::new(pool).await;
+    let products_manager = products::Products::new(pool);
 
     match products_manager
         .frontend()
@@ -57,7 +57,7 @@ pub async fn get_products_data(
     category_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
 
-    let products_manager = products::Products::new(pool.clone()).await;
+    let products_manager = products::Products::new(pool.clone());
 
     let page = match products_manager.frontend()
         .get_page(&parameters, category_slug)

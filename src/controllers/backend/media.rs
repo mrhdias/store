@@ -27,6 +27,7 @@ pub async fn library(
 
     let mut data = Context::new();
     data.insert("partial", "media");
+    data.insert("title", "Media");
     data.insert("library", &rows);
     let rendered = tera.render("backend/admin.html", &data).unwrap();
     Html(rendered)

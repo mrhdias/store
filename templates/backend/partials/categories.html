@@ -1,5 +1,22 @@
 {% import "backend/macros.html" as macros %}
 <style>
+table.list-items img {
+    display: block;
+    max-width: 40px;
+    max-height: 40px;
+}
+
+table.list-items .thumbnail {
+    text-align: center;
+    width: 50px;
+}
+
+table.list-items .thumbnail > img {
+    display: block;
+    max-width: 40px;
+    max-height: 40px;
+}
+
 table.list-items .count {
     width: 150px;
     text-align: right;
@@ -16,6 +33,11 @@ table.list-items .count {
     <table class="list-items categories">
         <thead>
             <th><input type="checkbox"></th>
+            <th class="thumbnail">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                    <path fill="black" d="M19 5v14H5V5zm0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2m-4.86 8.86l-3 3.87L9 13.14L6 17h12z"/>
+                </svg>
+            </th>
             <th>Name</th>
             <th>Description</th>
             <th>Slug</th>
@@ -25,7 +47,8 @@ table.list-items .count {
             {% for category in categories %}
             <tr>
                 <td><input type="checkbox"></td>
-                <td><a href="/admin/categories/{{ category.id }}">{{ category.name }}</a></td>
+                <td class="thumbnail"><a href="/admin/categories/{{ category.id }}"><img src="{{ category.image.src }}" alt="{{ category.image.alt }}"></a></td>
+                <td>{% if tree %}{% for _ in range(end=category.branches - 1) %}-{% endfor %} {% endif %}<a href="/admin/categories/{{ category.id }}">{{ category.name }}</a></td>
                 <td>{{ category.description }}</td>
                 <td>{{ category.slug }}</td>
                 <td class="count"><a href="#">{{ category.count }}</a></td>

@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-07-23 19:29:54
+// Last Modification: 2024-08-14 20:33:09
 //
 
 use sqlx::{
@@ -20,8 +20,22 @@ pub struct Media {
     src: String,
     name: String,
     alt: String,
-    date_created: String,
-    date_modified: String,
+    date_created: Option<String>,
+    date_modified: Option<String>,
+}
+
+impl Media {
+
+    pub fn default() -> Media {
+        Media {
+            id: 0,
+            src: "".to_string(),
+            name: "".to_string(),
+            alt: "".to_string(),
+            date_created: None,
+            date_modified: None,
+        }
+    }
 }
 
 pub struct MediaLibrary {
@@ -42,13 +56,13 @@ impl MediaLibrary {
                 src: row.get::<String, _>("src"),
                 name: row.get::<String, _>("name"),
                 alt: row.get::<String, _>("alt"),
-                date_created: || -> String {
+                date_created: || -> Option<String> {
                     let date_created = row.get::<NaiveDateTime, _>("date_created");
-                    date_created.format("%Y/%m/%d at %H:%M:%S").to_string()
+                    Some(date_created.format("%Y/%m/%d at %H:%M:%S").to_string())
                 }(),
-                date_modified: || -> String {
+                date_modified: || -> Option<String> {
                     let date_modified = row.get::<NaiveDateTime, _>("date_modified");
-                    date_modified.format("%Y/%m/%d at %H:%M:%S").to_string()
+                    Some(date_modified.format("%Y/%m/%d at %H:%M:%S").to_string())
                 }(),
             })
             .fetch_all(&self.pool)

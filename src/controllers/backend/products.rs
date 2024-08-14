@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-08-09 21:24:24
+// Last Modification: 2024-08-14 22:19:29
 //
 
 use crate::utils;
@@ -141,7 +141,7 @@ pub async fn handle(
     let mut image = products::ProductImage::new();
     let mut count = 0;
 
-    let products_manager = products::Products::new(pool.clone()).await;
+    let products_manager = products::Products::new(pool.clone());
 
     while let Some(field) = multipart.next_field().await.unwrap() {
 
@@ -513,7 +513,7 @@ pub async fn handle(
         status_names.push(status.as_str().to_string());
     }
 
-    let categories = match categories_manager.backend().get_all().await {
+    let categories = match categories_manager.backend().get_tree().await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -575,13 +575,13 @@ pub async fn edit(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
-    let products_manager = products::Products::new(pool.clone()).await;
+    let products_manager = products::Products::new(pool.clone());
 
     match products_manager.backend().get(id).await {
         Ok(product) => {
 
             let categories_manager = categories::Categories::new(pool);
-            let categories = match categories_manager.backend().get_all().await {
+            let categories = match categories_manager.backend().get_tree().await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("Error: {}", e);
@@ -602,6 +602,7 @@ pub async fn edit(
             
             let mut data = Context::new();
             data.insert("partial", "product");
+            data.insert("title", "Product");
             data.insert("product", &product);
             data.insert("categories", &categories);
             data.insert("status", &status_names);
@@ -644,7 +645,7 @@ pub async fn new(
     };
 
     let categories_manager = categories::Categories::new(pool);
-    let categories = match categories_manager.backend().get_all().await {
+    let categories = match categories_manager.backend().get_tree().await {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -661,6 +662,7 @@ pub async fn new(
 
     let mut data = Context::new();
     data.insert("partial", "product");
+    data.insert("title", "Product");
     data.insert("product", &product);
     data.insert("categories", &categories);
     data.insert("status", &status_names);
@@ -673,7 +675,7 @@ pub async fn list(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
     Extension(mut tera): Extension<Tera>) -> Html<String> {
 
-    let products_manager = products::Products::new(pool).await;
+    let products_manager = products::Products::new(pool);
 
     let page = match products_manager.backend()
         .get_page(&parameters)
@@ -689,6 +691,7 @@ pub async fn list(
 
     let mut data = Context::new();
     data.insert("partial", "products");
+    data.insert("title", "Products");
     data.insert("products", &page.products);
     data.insert("current_page", &page.current_page);
     data.insert("total_products", &page.total_count);
