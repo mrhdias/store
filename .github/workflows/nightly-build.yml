@@ -1,0 +1,91 @@
+name: Nightly Build
+
+# This schedule triggers the workflow to run at 12:00 AM UTC every day.
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: # This allows manual triggering as well
+  
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write  # Required to create and update releases
+  packages: write  # Required to upload assets
+  deployments: write
+  issues: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Run tests
+      run: cargo test
+      
+    - name: List files for debugging
+      run: |
+        echo "Listing target/release:"
+        ls -R target/release
+        echo "Listing templates:"
+        ls -R templates
+        echo "Listing static:"
+        ls -R static
+
+    - name: Make binary executable
+      run: chmod +x target/release/store
+    - name: Prepare ZIP file
+      run: |
+        mkdir -p release
+        cp target/release/store release/
+        cp -r templates release/
+        cp -r static release/
+        cd release
+        zip -r ../nightly-build.zip .
+
+    - name: Set up Git User
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+
+    - name: Set Date and Tag Name
+      id: date_and_tag
+      run: |
+        echo "BUILD_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+        echo "TAG_NAME=nightly-build-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
+
+    - name: Debugging before tagging
+      run: |
+        echo "Tag name is: ${{ env.TAG_NAME }}"
+        echo "Build date is: ${{ env.BUILD_DATE }}"
+        git status
+        git branch -a
+        git log -n 5
+        git tag -l
+
+    - name: Create Tag
+      run: |
+        if [ -z "${{ env.TAG_NAME }}" ]; then
+          echo "TAG_NAME is empty! Exiting..."
+          exit 1
+        fi
+        git tag -a "${{ env.TAG_NAME }}" -m "Nightly build ${{ env.BUILD_DATE }}" || (echo "Tag creation failed"; exit 1)
+
+    - name: Push Tag
+      run: git push origin "${{ env.TAG_NAME }}" || (echo "Tag push failed"; exit 1)
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG_NAME }}
+        name: "Nightly Build ${{ env.BUILD_DATE }}"
+        draft: false
+        prerelease: true
+        files: nightly-build.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
