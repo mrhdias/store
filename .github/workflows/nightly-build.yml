@@ -75,6 +75,7 @@ jobs:
       run: |
         mkdir -p release
         cp target/release/store release/
+        cp -r db release/
         cp -r templates release/
         cp -r static release/
         cd release
