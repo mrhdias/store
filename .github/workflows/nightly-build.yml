@@ -16,6 +16,38 @@ permissions:
   issues: write
 
 jobs:
+  delete-old-builds:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Delete old nightly builds and keep last 3
+      run: |
+        # Get the list of all nightly build tags, sorted by creation date
+        tags=$(gh api -X GET repos/${{ github.repository }}/tags | jq -r '.[] | select(.name | startswith("nightly-build-")) | .name' | sort)
+
+        # Calculate how many tags to delete, keeping the last 3
+        tags_count=$(echo "$tags" | wc -l)
+        tags_to_delete_count=$((tags_count - 3))
+
+        if [ "$tags_to_delete_count" -gt 0 ]; then
+          # Get the tags to delete
+          tags_to_delete=$(echo "$tags" | head -n $tags_to_delete_count)
+          echo "Tags to delete: $tags_to_delete"
+          for tag in $tags_to_delete; do
+            # Delete the tag
+            gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/$tag
+
+            # Find the corresponding release and delete it
+            release_id=$(gh api -X GET repos/${{ github.repository }}/releases | jq -r --arg TAG "$tag" '.[] | select(.tag_name == $TAG) | .id')
+            if [ ! -z "$release_id" ]; then
+              gh api -X DELETE repos/${{ github.repository }}/releases/$release_id
+            fi
+          done
+        else
+          echo "No old tags to delete."
+        fi
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
   build:
     runs-on: ubuntu-latest
 
