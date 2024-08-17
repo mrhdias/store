@@ -3,7 +3,7 @@ A sketch of an e-commerce store built with Rust, using PostgreSQL, [Axum](https:
 
 [![Rust](https://github.com/mrhdias/store/actions/workflows/rust.yml/badge.svg)](https://github.com/mrhdias/store/actions/workflows/rust.yml)
 
-If using ArchLinux, install [PostgreSQL](https://wiki.archlinux.org/title/PostgreSQL) by following these commands:
+If you're using ArchLinux, install [PostgreSQL](https://wiki.archlinux.org/title/PostgreSQL) by following these commands:
 ```
 sudo pacman -S postgresql
 sudo -i -u postgres
@@ -20,24 +20,25 @@ postgres=# CREATE DATABASE mystoredb OWNER store_admin;
 postgres=# GRANT ALL PRIVILEGES ON DATABASE mystoredb TO store_admin;
 postgres=# \q
 ```
-Populate the database with mock data to perform a test.
+Download the latest nightly build from [here](https://github.com/mrhdias/store/tags) and uncompress it:
 ```
-git clone https://github.com/mrhdias/store
-cd store
+unzip nightly-build-YYYYMMDDHHMMSS.zip
+```
+Populate the Database with Mock Data for Testing:
+```
 psql -W -U store_admin -d mystoredb -a -w -f db/schema.sql
 ```
-Compile and then run it:
+Run it:
+```
+./store
+```
+Take some time to review the configuration file: `./config/store.ini`
+
+If you prefer, you can compile and run the server from the source:
 ```
 cargo run
-Config Directory: "./config/store.ini"
-Take some time to check the configuration file.: ./config/store.ini
 ```
-Edit the configuration file, save it, and run it again:
-```
-nano -w ./config/store.ini
-cargo run
-```
-To view the store, enter the address http://0.0.0.0:8080/ in your favorite browser.
+To view the store, open the following address in your browser: http://0.0.0.0:8080/
 
 ![Login Screenshot](https://raw.githubusercontent.com/mrhdias/store/main/screenshots/login.png)
 ![Cart Screenshot](https://raw.githubusercontent.com/mrhdias/store/main/screenshots/cart.png)
