@@ -211,6 +211,7 @@ async fn main() {
     match is_database_empty(&pool).await {
         Ok(true) => {
             println!("Database is empty, applying schema migration");
+            // Embed the schema file as a resource
             match pool.execute(include_str!("../db/schema.sql")).await {
                 Ok(_) => println!("Database schema migration successful"),
                 Err(e) => {
@@ -231,7 +232,7 @@ async fn main() {
         .with_table_name(format!("{}_sessions", APP_NAME)).unwrap();
 
     match session_store.migrate().await {
-        Ok(()) => println!("Migration successful"),
+        Ok(()) => println!("Session store migration successful"),
         Err(e) => {
             panic!("Error during migration: {}", e);
         }

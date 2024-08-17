@@ -1,5 +1,5 @@
 //
-// Last Modification: 2024-08-17 10:02:44
+// Last Modification: 2024-08-17 17:26:08
 //
 
 use std::process::exit;
@@ -42,6 +42,13 @@ impl Config {
 
     // Helper function to prompt for a non-empty string
     fn prompt_valid_str(prompt: &str, default: Option<&str>) -> String {
+
+        let prompt = if default.is_some() {
+            &format!(r#"{} (default "{}"): "#, prompt, default.unwrap())
+        } else {
+            &format!("{}: ", prompt)
+        };
+
         loop {
             let mut input = String::new();
             print!("{}", prompt);
@@ -62,6 +69,13 @@ impl Config {
 
     // Helper function to prompt for a valid u32 value
     fn prompt_valid_u32(prompt: &str, default: Option<u32>) -> u32 {
+
+        let prompt = if default.is_some() {
+            &format!(r#"{} (default "{}"): "#, prompt, default.unwrap())
+        } else {
+            &format!("{}: ", prompt)
+        };
+
         loop {
             let mut input = String::new();
             print!("{}", prompt);
@@ -81,6 +95,13 @@ impl Config {
 
         // Helper function to prompt for a valid directory
         fn prompt_directory(prompt: &str, default: Option<&str>) -> String {
+
+            let prompt = if default.is_some() {
+                &format!(r#"{} (default "{}"): "#, prompt, default.unwrap())
+            } else {
+                &format!("{}: ", prompt)
+            };
+
             loop {
                 let mut input = String::new();
                 print!("{}", prompt);
@@ -187,18 +208,18 @@ impl Config {
         println!("Database Configuration:");
 
         let database = DatabaseConf {
-            host: Self::prompt_valid_str("Host (default: localhost): ", Some("localhost")),
-            user: Self::prompt_valid_str("User: ", None),
-            password: Self::prompt_valid_str("Password: ", None),
-            name: Self::prompt_valid_str("Name: ", None),
-            max_connections: Self::prompt_valid_u32("Max connections (default 5): ", Some(5)),
+            host: Self::prompt_valid_str("Host", Some("localhost")),
+            user: Self::prompt_valid_str("User", None),
+            password: Self::prompt_valid_str("Password", None),
+            name: Self::prompt_valid_str("Name", None),
+            max_connections: Self::prompt_valid_u32("Max connections", Some(5)),
         };
 
         println!("Directories Configuration:");
 
         let directories = DirectoriesConf {
-            static_dir: Self::prompt_directory("Static: ", Some("static")),
-            templates_dir: Self::prompt_directory("Templates: ", Some("templates")),
+            static_dir: Self::prompt_directory("Static", Some("static")),
+            templates_dir: Self::prompt_directory("Templates", Some("templates")),
         };
 
         // println!("{:?} {:?}", database, directories);

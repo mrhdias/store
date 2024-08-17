@@ -73,9 +73,9 @@ jobs:
       run: chmod +x target/release/store
     - name: Prepare ZIP file
       run: |
-        mkdir -p release
+        mkdir -p release/db
         cp target/release/store release/
-        cp -r db release/
+        cp -r db/data.sql release/db/
         cp -r templates release/
         cp -r static release/
         cd release

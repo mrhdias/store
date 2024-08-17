@@ -98,151 +98,150 @@ a {
 <body>
     {% include 'frontend/partials/header.html' %}
 
+    {%- macro set_price(default, price, method='common') -%}
+        {% if price < 0 %}{{ default | round(method=method) }}{% else %}{{ price | round(method=method) }}{% endif %}
+    {%- endmacro set_price -%}
+
     <main class="container">
-        
-        <div class="sidebar">
-            {% if categories %}
-            <div class="box categories">
-                <h3 class="title">Categories:</h3>
-                <ul>
-                    <li><a href="/products">All</a></li>
-                    {% for category in categories %}
-                        {% if category.count == 0 %}
-                        <li title="Without products">
-                            {% for _ in range(end=category.branches - 1) %}
-                            &nbsp;&nbsp;
-                            {% endfor %}
-                            {{category.name}}
-                        </li>
-                        {% else %}
-                        <li title="{{category.count}} products">
-                            <a href="/product-category/{{category.slug}}">
+        {% if products | length == 0  %}
+            <span style="width: 100%;">The product catalog is empty!</span>
+        {% else %}
+            <div class="sidebar">
+                {% if categories %}
+                <div class="box categories">
+                    <h3 class="title">Categories:</h3>
+                    <ul>
+                        <li><a href="/products">All</a></li>
+                        {% for category in categories %}
+                            {% if category.count == 0 %}
+                            <li title="Without products">
                                 {% for _ in range(end=category.branches - 1) %}
                                 &nbsp;&nbsp;
                                 {% endfor %}
                                 {{category.name}}
-                            </a>
-                        </li>
-                        {% endif %}
+                            </li>
+                            {% else %}
+                            <li title="{{category.count}} products">
+                                <a href="/product-category/{{category.slug}}">
+                                    {% for _ in range(end=category.branches - 1) %}
+                                    &nbsp;&nbsp;
+                                    {% endfor %}
+                                    {{category.name}}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <form id="product-filter" method="get" action="{{ path }}">
+                    <div class="box">
+                        <h3 class="title">Price: <span id="price-range-status" style="font-weight: normal; font-size: 14px;">{% if min_price < 0 and max_price < 0 %}Off{% else %}On{% endif %}</span></h3>
+                        <div>
+                            <label for="minimum-price">Minimum</label>
+
+                            <input type="range" id="minimum-price" name="min_price"
+                                min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
+                                value="{{ self::set_price(default=default_min_price, price=min_price, method='floor') }}" step="1"
+                                oninput="rangePrice(this);" />
+                            <output name="result" for="minimum-price">{{ self::set_price(default=default_min_price, price=min_price, method='floor') }} €</output>
+                        </div>
+                        <div>
+                            <label for="maximum-price">Maximum</label>
+                            <input type="range" id="maximum-price" name="max_price"
+                                min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
+                                value="{{ self::set_price(default=default_max_price, price=max_price) }}" step="1"
+                                oninput="rangePrice(this);" />
+                            <output name="result" for="maximum-price">{{ self::set_price(default=default_max_price, price=max_price) }} €</output>
+                        </div>
+                    </div>
+
+                    <div class="box" style="flex-direction: row; gap: 5px;">
+                        <input id="on-sale" type="checkbox" name="on_sale" value="true" {% if on_sale == true %}checked{% endif %}>
+                        <label for="on-sale">On Sale</label>
+                    </div>
+
+                    <div>
+                        <button type="button" onclick="filter();">Filter</button>
+                        <button type="button" onclick="resetFilters();">Reset</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="content">
+                <div style="display: flex; gap: 10px;">
+                    <span style="background-color: #b0bec5;padding: 2px 6px;border-radius: 5px;font-size: 14px;">{{ total_products }} items</span>
+                    {% if products | length > 1  %}
+                    <form id="sort-products" method="get" action="{{ path }}">
+                        <input type="hidden" name="min_price" value="{{ min_price | round(method='floor') }}">
+                        <input type="hidden" name="max_price" value="{{ max_price | round }}">
+                        <input type="hidden" name="on_sale" value="{{ on_sale }}">
+                        <select name="sort" onchange="sortProducts(this);">
+                        {% for option in ['date::asc::Latest', 'price::asc::Price: Low to High', 'price::desc::Price: High to Low'] %}
+                            {% set parts = option | split(pat='::') %}
+                            <option value="{{ parts[0] }}_{{ parts[1] }}" {% if order_by == parts[0] and order == parts[1] %}selected{% endif %}>{{ parts[2] }}</option>
+                        {% endfor %}
+                        </select>
+                    </form>
+                    {% endif %}
+                </div>
+                <ul class="product-list">
+                    {% for product in products %}
+                    <li>
+                        <a href="{{ product.permalink }}">
+                            <img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}">
+                            {% set promotion = (1 - (product.price / product.regular_price)) * 100.0 %}
+                            <div class="labels">
+                                {% if product.stock_status == "outofstock" %}
+                                <label class="outofstock">Out off stock</label>
+                                {% endif %}
+                                {% if product.on_sale and promotion > 0 %}
+                                <label class="onsale">-{{ promotion | round }}%</label>
+                                {% endif %}
+                            </div>
+                        </a>
+                        <h2>{{ product.name }}</h2>
+                        <p>SKU: {{ product.sku }}</p>
+                        <p>{{ product.short_description }}</p>
+                        <p>
+                            {% if product.on_sale %}
+                                <span class="sales_price">{{ product.regular_price | round_and_format(places=2) }} €</span>
+                            {% endif %}
+                            <span class="regular_price">{{ product.price | round_and_format(places=2) }} €</span>
+                        </p>
+                        <form action="/cart/add" method="post">
+                            <input type="hidden" name="product_id" value="{{ product.id }}">
+                            <input type="hidden" id="product-quantity" name="product_quantity" value="1">
+                            <button type="submit" {% if product.stock_status == "outofstock" %}disabled{% endif %}>Add To Cart</button>
+                        </form>
+                    </li>
                     {% endfor %}
                 </ul>
-            </div>
-            {% endif %}
 
-            <form id="product-filter" method="get" action="{{ path }}">
-                <div class="box">
-                    <h3 class="title">Price: <span id="price-range-status" style="font-weight: normal; font-size: 14px;">{% if min_price < 0 and max_price < 0 %}Off{% else %}On{% endif %}</span></h3>
-                    <div>
-                        <label for="minimum-price">Minimum</label>
-                        {%- macro set_price(default, price, method='common') -%}
-                            {% if price < 0 %}{{ default | round(method=method) }}{% else %}{{ price | round(method=method) }}{% endif %}
-                        {%- endmacro set_price -%}
-                        <input type="range" id="minimum-price" name="min_price"
-                            min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
-                            value="{{ self::set_price(default=default_min_price, price=min_price, method='floor') }}" step="1"
-                            oninput="rangePrice(this);" />
-                        <output name="result" for="minimum-price">{{ self::set_price(default=default_min_price, price=min_price, method='floor') }} €</output>
+                {% if total_pages > 1 %}
+                    {% set previous_page = current_page - 1 %}
+                    {% if previous_page == 0 %}
+                        {% set previous_page = 1 %}
+                    {% endif %}
+                    {% set next_page = current_page + 1 %}
+                    {% if next_page > total_pages %}
+                        {% set next_page = current_page %}
+                    {% endif %}
+                    <div style="display: flex;gap: 10px;margin-top: 20px;width: 100%;justify-content: center;">
+                        <a href="{{ path }}?page={{ previous_page }}{% if query != '' %}&{{ query }}{% endif %}">‹</a>
+                        <ul class="pagination">
+                        {% for page in range(end=total_pages) %}
+                            <li {% if current_page == page + 1 %}class="current_page"{% endif %}>
+                                <a href="{{ path }}?page={{ page + 1 }}{% if query != '' %}&{{ query }}{% endif %}">{{ page + 1 }}</a>
+                            </li>
+                        {% endfor %}
+                        </ul>
+                        <a href="{{ path }}?page={{ next_page }}{% if query != '' %}&{{ query }}{% endif %}">›</a>
                     </div>
-                    <div>
-                        <label for="maximum-price">Maximum</label>
-                        <input type="range" id="maximum-price" name="max_price"
-                            min="{{ default_min_price | round(method='floor') }}" max="{{ default_max_price | round }}"
-                            value="{{ self::set_price(default=default_max_price, price=max_price) }}" step="1"
-                            oninput="rangePrice(this);" />
-                        <output name="result" for="maximum-price">{{ self::set_price(default=default_max_price, price=max_price) }} €</output>
-                    </div>
-                </div>
-
-                <div class="box" style="flex-direction: row; gap: 5px;">
-                    <input id="on-sale" type="checkbox" name="on_sale" value="true" {% if on_sale == true %}checked{% endif %}>
-                    <label for="on-sale">On Sale</label>
-                </div>
-
-                <div>
-                    <button type="button" onclick="filter();">Filter</button>
-                    <button type="button" onclick="resetFilters();">Reset</button>
-                </div>
-            </form>
-
-
-        </div>
-        <div class="content">
-        {% if products | length == 0  %}
-            <span style="width: 100%;">The product catalog is empty!</span>
-        {% else %}
-            <div style="display: flex; gap: 10px;">
-                <span style="background-color: #b0bec5;padding: 2px 6px;border-radius: 5px;font-size: 14px;">{{ total_products }} items</span>
-                {% if products | length > 1  %}
-                <form id="sort-products" method="get" action="{{ path }}">
-                    <input type="hidden" name="min_price" value="{{ min_price | round(method='floor') }}">
-                    <input type="hidden" name="max_price" value="{{ max_price | round }}">
-                    <input type="hidden" name="on_sale" value="{{ on_sale }}">
-                    <select name="sort" onchange="sortProducts(this);">
-                    {% for option in ['date::asc::Latest', 'price::asc::Price: Low to High', 'price::desc::Price: High to Low'] %}
-                        {% set parts = option | split(pat='::') %}
-                        <option value="{{ parts[0] }}_{{ parts[1] }}" {% if order_by == parts[0] and order == parts[1] %}selected{% endif %}>{{ parts[2] }}</option>
-                    {% endfor %}
-                    </select>
-                </form>
                 {% endif %}
             </div>
-            <ul class="product-list">
-                {% for product in products %}
-                <li>
-                    <a href="{{ product.permalink }}">
-                        <img src="{{ product.gallery[0].src }}" alt="{{ product.gallery[0].alt }}">
-                        {% set promotion = (1 - (product.price / product.regular_price)) * 100.0 %}
-                        <div class="labels">
-                            {% if product.stock_status == "outofstock" %}
-                            <label class="outofstock">Out off stock</label>
-                            {% endif %}
-                            {% if product.on_sale and promotion > 0 %}
-                            <label class="onsale">-{{ promotion | round }}%</label>
-                            {% endif %}
-                        </div>
-                    </a>
-                    <h2>{{ product.name }}</h2>
-                    <p>SKU: {{ product.sku }}</p>
-                    <p>{{ product.short_description }}</p>
-                    <p>
-                        {% if product.on_sale %}
-                            <span class="sales_price">{{ product.regular_price | round_and_format(places=2) }} €</span>
-                        {% endif %}
-                        <span class="regular_price">{{ product.price | round_and_format(places=2) }} €</span>
-                    </p>
-                    <form action="/cart/add" method="post">
-                        <input type="hidden" name="product_id" value="{{ product.id }}">
-                        <input type="hidden" id="product-quantity" name="product_quantity" value="1">
-                        <button type="submit" {% if product.stock_status == "outofstock" %}disabled{% endif %}>Add To Cart</button>
-                    </form>
-                </li>
-                {% endfor %}
-            </ul>
-
-            {% if total_pages > 1 %}
-                {% set previous_page = current_page - 1 %}
-                {% if previous_page == 0 %}
-                    {% set previous_page = 1 %}
-                {% endif %}
-                {% set next_page = current_page + 1 %}
-                {% if next_page > total_pages %}
-                    {% set next_page = current_page %}
-                {% endif %}
-                <div style="display: flex;gap: 10px;margin-top: 20px;width: 100%;justify-content: center;">
-                    <a href="{{ path }}?page={{ previous_page }}{% if query != '' %}&{{ query }}{% endif %}">‹</a>
-                    <ul class="pagination">
-                    {% for page in range(end=total_pages) %}
-                        <li {% if current_page == page + 1 %}class="current_page"{% endif %}>
-                            <a href="{{ path }}?page={{ page + 1 }}{% if query != '' %}&{{ query }}{% endif %}">{{ page + 1 }}</a>
-                        </li>
-                    {% endfor %}
-                    </ul>
-                    <a href="{{ path }}?page={{ next_page }}{% if query != '' %}&{{ query }}{% endif %}">›</a>
-                </div>
-            {% endif %}
-
         {% endif %}
-        </div>
 
         <script>
 

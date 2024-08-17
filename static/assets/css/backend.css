@@ -30,7 +30,7 @@ main {
 #sidebar {
     display: block;
     padding: 20px;
-    min-width: 90px;
+    min-width: fit-content;
 }
 
 #sidebar ul.menu {

@@ -20,17 +20,14 @@ postgres=# CREATE DATABASE mystoredb OWNER store_admin;
 postgres=# GRANT ALL PRIVILEGES ON DATABASE mystoredb TO store_admin;
 postgres=# \q
 ```
-Download the latest nightly build from [here](https://github.com/mrhdias/store/tags) and uncompress it:
+Download the latest nightly build from [here](https://github.com/mrhdias/store/tags), uncompress and run it:
 ```
 unzip nightly-build-YYYYMMDDHHMMSS.zip
+./store
 ```
 Populate the Database with Mock Data for Testing:
 ```
-psql -W -U store_admin -d mystoredb -a -w -f db/schema.sql
-```
-Run it:
-```
-./store
+psql -W -U store_admin -d mystoredb -a -w -f db/data.sql
 ```
 Take some time to review the configuration file: `./config/store.ini`
 
