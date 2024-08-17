@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-08-14 19:18:30
+// Last Modified: 2024-08-17 10:03:11
 //
 // References:
 // https://dev.to/krowemoh/a-web-app-in-rust-02-templates-5do1
@@ -73,6 +73,22 @@ use serde::{
 };
 
 const APP_NAME: &str = "store";
+const DEFAULT_CONFIG_FILE: &str = "config/store.ini";
+
+use clap::Parser;
+
+#[derive(Parser)]
+#[command(name = APP_NAME)]
+// #[command(author = "Author Name")]
+#[command(version = "0.0.1")]
+#[command(about = "E-Commerce Plataform", long_about = None)]
+struct Cli {
+    #[arg(short = 'c', long = "config", default_value = DEFAULT_CONFIG_FILE)]
+    config_file: String,
+
+    #[arg(short = 'p', long = "port", default_value_t = 8080)]
+    port: u16,
+}
 
 #[derive(Debug, Deserialize)]
 struct LoginForm {
@@ -157,9 +173,22 @@ async fn is_database_empty(pool: &Pool<Postgres>) -> Result<bool, Error> {
 #[tokio::main]
 async fn main() {
 
-    let config_dir: PathBuf = Path::new(".").join("config");
-    let config = setup::Config::new(APP_NAME, &config_dir);
-    let db_conf= match config.load() {
+    let args = Cli::parse();
+
+    // println!("Config file: {}", args.config_file);
+    // println!("Port: {}", args.port);
+
+    if args.config_file == DEFAULT_CONFIG_FILE {
+        let config_dir: PathBuf = Path::new(".").join("config");
+        if !config_dir.exists() {
+            std::fs::create_dir(&config_dir)
+                .expect("Failed to create config directory");
+        }
+    }
+
+    let config = setup::Config::new(args.config_file.into());
+
+    let settings= match config.load() {
         Ok(conf) => conf,
         Err(e) => {
             panic!("Error loading database configuration: {}", e);
@@ -167,14 +196,14 @@ async fn main() {
     };
 
     let options = PgConnectOptions::new()
-        .host(&db_conf.host)
-        .username(&db_conf.user)
-        .password(&db_conf.password)
-        .database(&db_conf.name)
+        .host(&settings.database.host)
+        .username(&settings.database.user)
+        .password(&settings.database.password)
+        .database(&settings.database.name)
         .to_owned();
 
     let pool = PgPoolOptions::new()
-        .max_connections(db_conf.max_connections)
+        .max_connections(settings.database.max_connections)
         .connect_with(options)
         .await
         .expect("Failed to make connection pool! Please check if the PostgreSQL server is running and try again");
@@ -212,7 +241,8 @@ async fn main() {
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)))
         .with_secure(false);
 
-    let tera = Tera::new("templates/**/*").unwrap();
+
+    let tera = Tera::new(&format!("{}/**/*", settings.directories.templates_dir)).unwrap();
 
     let admin_router = Router::new()
         .route("/media", get(controllers::backend::media::library))
@@ -261,11 +291,11 @@ async fn main() {
         // .nest_service("/assets", ServeDir::new("static/assets"))
         // .nest_service("/uploads", ServeDir::new("static/uploads"))
         .layer(session_layer)
-        .fallback_service(ServeDir::new("static"));
+        .fallback_service(ServeDir::new(&settings.directories.static_dir));
 
     let app = NormalizePathLayer::trim_trailing_slash().layer(app);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
+    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{}", args.port))
         .await
         .unwrap();
     axum::serve(listener, ServiceExt::<Request>::into_make_service(app))

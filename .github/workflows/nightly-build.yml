@@ -26,7 +26,7 @@ jobs:
 
         # Calculate how many tags to delete, keeping the last 3
         tags_count=$(echo "$tags" | wc -l)
-        tags_to_delete_count=$((tags_count - 3))
+        tags_to_delete_count=$((tags_count - 2))
 
         if [ "$tags_to_delete_count" -gt 0 ]; then
           # Get the tags to delete

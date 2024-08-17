@@ -7,6 +7,7 @@ edition = "2021"
 anyhow = "1.0.86"
 axum = { version = "0.7.5", features = ["form", "multipart"] }
 chrono = { version = "0.4.38", features = ["serde"] }
+clap = { version = "4.5.16", features = ["derive"] }
 decimal = "2.1.0"
 lettre = { version = "0.11.7", features = ["tokio1-native-tls"] }
 num-traits = "0.2.19"
