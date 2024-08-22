@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-08-01 19:33:59
+// Last Modified: 2024-08-22 19:21:04
 // References:
 // https://woocommerce.com/document/managing-orders/order-statuses/
 //
@@ -25,7 +25,7 @@ use tera::{Tera, Context};
 use serde::{Serialize, Deserialize};
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct RawOrder {
     billing_first_name: String,
     billing_last_name: String,
@@ -49,7 +49,7 @@ pub struct RawOrder {
     calculate_shipping: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct Billing {
     first_name: String,
     last_name: String,
@@ -62,7 +62,7 @@ struct Billing {
     tax_id_number: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct Shipping {
     first_name: String,
     last_name: String,
@@ -72,7 +72,7 @@ struct Shipping {
     country_code: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 struct Country {
     code: String,
     name: String,
@@ -90,10 +90,11 @@ fn calc_tax_value(
 }
 
 fn checkout_data(
-    products: Vec<Product>,
     payload: RawOrder,
+    products: &Vec<Product>,
     total_shipping: &f32,
-    alert: &str) -> Context {
+    alert: Option<&str>
+) -> Context {
 
     let countries = vec![
         Country{
@@ -113,9 +114,11 @@ fn checkout_data(
     let mut data = Context::new();
     data.insert("partial", "checkout");
     data.insert("title", "Checkout");
-    if !alert.is_empty() {
-        data.insert("alert", &alert);
+
+    if alert.is_some() && !alert.unwrap().is_empty() {
+        data.insert("alert", alert.unwrap());
     }
+
     data.insert("countries", &countries);
     data.insert("billing", &Billing {
         first_name: payload.billing_first_name,
@@ -147,8 +150,8 @@ fn checkout_data(
         Some(value) => value,
         None => "".to_string(),
     });
-    data.insert("cart", &products);
-    data.insert("shipping_total", &total_shipping);
+    data.insert("cart", products);
+    data.insert("shipping_total", total_shipping);
 
     data
 }
@@ -213,7 +216,11 @@ pub async fn place_order(
 
                 tera.register_filter("round_and_format", utils::round_and_format_filter);
 
-                let data = checkout_data(products, payload, &total_shipping, &alert);
+                let data = checkout_data(
+                    payload,
+                    &products,
+                    &total_shipping,
+                    Some(&alert));
                 let rendered = tera.render("frontend/shopping.html", &data).unwrap();
                 Html(rendered)
 
@@ -389,48 +396,34 @@ pub async fn show(
 
             tera.register_filter("round_and_format", utils::round_and_format_filter);
 
-            let countries = vec![
-                Country{
-                    code: "FR".to_string(),
-                    name: "France".to_string(),
+            let data = checkout_data(
+                RawOrder {
+                    billing_first_name: "".to_string(),
+                    billing_last_name: "".to_string(),
+                    email: "".to_string(),
+                    phone: "".to_string(),
+                    billing_address: "".to_string(),
+                    billing_postcode: "".to_string(),
+                    billing_city: "".to_string(),
+                    billing_country: "".to_string(),
+                    tax_id_number: None,
+                    ship_to_different_address: None,
+                    shipping_first_name: "".to_string(),
+                    shipping_last_name: "".to_string(),
+                    shipping_address: "".to_string(),
+                    shipping_postcode: "".to_string(),
+                    shipping_city: "".to_string(),
+                    shipping_country: "".to_string(),
+                    terms: None,
+                    payment_method: "".to_string(),
+                    order_comments: None,
+                    calculate_shipping: None,
                 },
-                Country{
-                    code: "PT".to_string(),
-                    name: "Portugal".to_string(),
-                },
-                Country{
-                    code: "ES".to_string(),
-                    name: "Spain".to_string(),
-                },
-            ];
+                &products,
+                &-1.00,
+                None);
 
-            let mut data = Context::new();
-            data.insert("partial", "checkout");
-            data.insert("title", "Checkout");
-            data.insert("countries", &countries);
-            data.insert("billing", &Billing {
-                first_name: "".to_string(),
-                last_name: "".to_string(),
-                email: "".to_string(),
-                phone: "".to_string(),
-                address: "".to_string(),
-                postcode: "".to_string(),
-                city: "".to_string(),
-                country_code: "".to_string(),
-                tax_id_number: "".to_string(),
-            });
-            data.insert("shipping_to_different_address", &false);
-            data.insert("shipping", &Shipping {
-                first_name: "".to_string(),
-                last_name: "".to_string(),
-                address: "".to_string(),
-                postcode: "".to_string(),
-                city: "".to_string(),
-                country_code: "".to_string(),
-            });
-            data.insert("order_comments", "");
-            data.insert("cart", &products);
-            data.insert("shipping_total", &-1.00);
+
             let rendered = tera.render("frontend/shopping.html", &data).unwrap();
             Html(rendered)
         },

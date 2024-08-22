@@ -273,7 +273,7 @@ document.getElementById('ship-to-different-address').addEventListener('change', 
 
 document.getElementById('calculate-shipping').addEventListener('click', function() {
     populate_shipping();
-    document.getElementById('terms').checked = true;
+    document.getElementById('terms').required = false;
 });
 
 document.getElementById('place-order').addEventListener('click', function() {
