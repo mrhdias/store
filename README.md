@@ -1,5 +1,5 @@
 # store
-A sketch of an e-commerce store built with Rust, using PostgreSQL, [Axum](https://github.com/tokio-rs/axum), and the [Tera](https://keats.github.io/tera/) template engine.
+A prototype of an e-commerce store built with Rust, using PostgreSQL, [Axum](https://github.com/tokio-rs/axum), and the [Tera](https://keats.github.io/tera/) template engine.
 
 [![Rust](https://github.com/mrhdias/store/actions/workflows/rust.yml/badge.svg)](https://github.com/mrhdias/store/actions/workflows/rust.yml)
 
@@ -33,6 +33,8 @@ Take some time to review the configuration file: `./config/store.ini`
 
 If you prefer, you can compile and run the server from the source:
 ```
+git clone https://github.com/mrhdias/store
+cd store
 cargo run
 ```
 To view the store, open the following address in your browser: http://0.0.0.0:8080/
