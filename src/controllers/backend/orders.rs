@@ -1,6 +1,6 @@
 //
 // Description: List all orders
-// Last Modification: 2024-08-09 21:23:32
+// Last Modification: 2024-08-30 19:36:22
 //
 
 use crate::models::orders;
@@ -19,7 +19,7 @@ use tera::{
 
 pub async fn new(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     Html("Add new order unimplemented".to_string())
 }
@@ -27,7 +27,7 @@ pub async fn new(
 pub async fn edit(
     Path(id):Path<i32>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     Html("Edit order unimplemented".to_string())
 }
@@ -36,7 +36,7 @@ pub async fn edit(
 pub async fn list(
     Query(parameters): Query<orders::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let orders_manager = orders::Orders::new(pool);
 
@@ -75,8 +75,6 @@ pub async fn list(
         vec![]
     };
 
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
-
     let mut data = Context::new();
     data.insert("partial", "orders");
     data.insert("orders", &orders);
@@ -93,7 +91,7 @@ pub async fn list(
 pub async fn list(
     Query(parameters): Query<orders::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>,
+    Extension(tera): Extension<Tera>,
 ) -> Html<String> {
 
     let orders_manager = orders::Orders::new(pool);
@@ -107,8 +105,6 @@ pub async fn list(
             return Html("An error happened while fetching orders".to_string());
         },
     };
-
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
 
     let mut data = Context::new();
     data.insert("partial", "orders");

@@ -190,9 +190,7 @@ async fn main() {
 
     let settings= match config.load() {
         Ok(conf) => conf,
-        Err(e) => {
-            panic!("Error loading database configuration: {}", e);
-        }
+        Err(e) => panic!("Error loading database configuration: {}", e),
     };
 
     let options = PgConnectOptions::new()
@@ -214,15 +212,11 @@ async fn main() {
             // Embed the schema file as a resource
             match pool.execute(include_str!("../db/schema.sql")).await {
                 Ok(_) => println!("Database schema migration successful"),
-                Err(e) => {
-                    panic!("Error during schema migration: {}", e);
-                }
+                Err(e) => panic!("Error during schema migration: {}", e),
             }
         },
         Ok(false) => println!("Database is not empty, skipping schema migration"),
-        Err(e) => {
-            panic!("Error checking database schema: {}", e);
-        }
+        Err(e) => panic!("Error checking database schema: {}", e),
     };
 
     // https://github.com/maxcountryman/tower-sessions
@@ -233,17 +227,20 @@ async fn main() {
 
     match session_store.migrate().await {
         Ok(()) => println!("Session store migration successful"),
-        Err(e) => {
-            panic!("Error during migration: {}", e);
-        }
+        Err(e) => panic!("Error during migration: {}", e),
     };
 
     let session_layer = SessionManagerLayer::new(session_store)
         .with_expiry(Expiry::OnInactivity(Duration::hours(1)))
         .with_secure(false);
 
-
-    let tera = Tera::new(&format!("{}/**/*", settings.directories.templates_dir)).unwrap();
+    // tera template engine
+    let mut tera = match Tera::new(&format!("{}/**/*", settings.directories.templates_dir)) {
+        Ok(t) => t,
+        Err(e) => panic!("Error initializing Tera: {}", e),
+    };
+    tera.register_filter("round_and_format", utils::round_and_format_filter);
+    tera.register_function("shortcode", controllers::frontend::shortcodes::make_shortcode());
 
     let admin_router = Router::new()
         .route("/media", get(controllers::backend::media::library))

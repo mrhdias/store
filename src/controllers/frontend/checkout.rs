@@ -1,5 +1,5 @@
 //
-// Last Modified: 2024-08-22 19:21:04
+// Last Modified: 2024-08-30 19:30:09
 // References:
 // https://woocommerce.com/document/managing-orders/order-statuses/
 //
@@ -160,7 +160,7 @@ pub async fn place_order(
     headers: HeaderMap,
     session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>,
+    Extension(tera): Extension<Tera>,
     Form(payload): Form<RawOrder>) -> Html<String> {
 
     println!("Order Billing: {:?}", payload);
@@ -213,8 +213,6 @@ pub async fn place_order(
                 println!("Show Shipping Calculations: {}", total_shipping);
 
                 session.insert("cart", current_cart).await.unwrap();
-
-                tera.register_filter("round_and_format", utils::round_and_format_filter);
 
                 let data = checkout_data(
                     payload,
@@ -354,7 +352,6 @@ pub async fn place_order(
 
                         cart.reset();
                         session.insert("cart", current_cart).await.unwrap();
-                        tera.register_filter("round_and_format", utils::round_and_format_filter);
 
                         let mut data = Context::new();
                         data.insert("partial", "order_details");
@@ -382,7 +379,7 @@ pub async fn place_order(
 pub async fn show(
     session: Session,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let mut current_cart: HashMap<i32, i32> = match session.get("cart").await.unwrap() {
         Some(cart) => cart,
@@ -393,8 +390,6 @@ pub async fn show(
     match cart.get().await {
         Ok(products) => {
             session.insert("cart", current_cart).await.unwrap();
-
-            tera.register_filter("round_and_format", utils::round_and_format_filter);
 
             let data = checkout_data(
                 RawOrder {

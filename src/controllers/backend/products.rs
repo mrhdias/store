@@ -1,8 +1,7 @@
 //
-// Last Modification: 2024-08-14 22:19:29
+// Last Modification: 2024-08-30 19:35:58
 //
 
-use crate::utils;
 use crate::models;
 use crate::models::products;
 use crate::models::categories;
@@ -106,7 +105,7 @@ fn upload_image(data: &axum::body::Bytes, filename: &str) -> Result<PathBuf, any
 pub async fn handle(
     Path(id):Path<i32>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>,
+    Extension(tera): Extension<Tera>,
     mut multipart: Multipart) -> Html<String> {
 
     let mut sale_price = -1.00;
@@ -528,8 +527,6 @@ pub async fn handle(
         match products_manager.backend().add(&product).await {
             Ok(id) => {
                 product.id = id;
-    
-                tera.register_filter("round_and_format", utils::round_and_format_filter);
                 
                 let mut data = Context::new();
                 data.insert("partial", "product");
@@ -549,8 +546,6 @@ pub async fn handle(
         match products_manager.backend().update(&product, &images, delete_media).await {
             Ok(_) => {
                 println!("Product updated successfully.");
-
-                tera.register_filter("round_and_format", utils::round_and_format_filter);
 
                 let mut data = Context::new();
                 data.insert("partial", "product");
@@ -573,7 +568,7 @@ pub async fn handle(
 pub async fn edit(
     Path(id):Path<i32>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let products_manager = products::Products::new(pool.clone());
 
@@ -596,8 +591,6 @@ pub async fn edit(
                 status_names.push(status.as_str().to_string());
             }
 
-            tera.register_filter("round_and_format", utils::round_and_format_filter);
-
             println!("Product: {:?}", product);
             
             let mut data = Context::new();
@@ -619,7 +612,7 @@ pub async fn edit(
 
 pub async fn new(
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     // let categories = vec![];
 
@@ -658,8 +651,6 @@ pub async fn new(
         status_names.push(status.as_str().to_string());
     }
 
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
-
     let mut data = Context::new();
     data.insert("partial", "product");
     data.insert("title", "Product");
@@ -673,7 +664,7 @@ pub async fn new(
 pub async fn list(
     Query(parameters): Query<products::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let products_manager = products::Products::new(pool);
 
@@ -686,8 +677,6 @@ pub async fn list(
             return Html("An error happened while fetching products".to_string());
         },
     };
-
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
 
     let mut data = Context::new();
     data.insert("partial", "products");

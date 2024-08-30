@@ -71,7 +71,7 @@ INSERT INTO product_media (product_id, media_id) VALUES (7, 7);
 
 -- 8 --
 INSERT INTO products (sku, name, slug, permalink, description, short_description, price, regular_price, sale_price, on_sale, stock_quantity, weight)
-VALUES ('6896501', 'Nulla Justo Justo', 'nulla-justo-justo', 'http://127.0.0.1:8080/product/nulla-justo-justo', 'Nulla justo justo, molestie non convallis eu, mollis ut orci. Phasellus non posuere leo, nec pretium enim. Ut vitae metus eget elit mattis varius quis a ex. Nam bibendum felis ac euismod dapibus.', 'Nulla justo justo, molestie non convallis eu, mollis ut orci. Phasellus non posuere leo, nec pretium enim.', 8.55, 8.55, 8.55, FALSE, 14, 210);
+VALUES ('6896521', 'Nulla Justo Justo', 'nulla-justo-justo', 'http://127.0.0.1:8080/product/nulla-justo-justo', 'Nulla justo justo, molestie non convallis eu, mollis ut orci. Phasellus non posuere leo, nec pretium enim. Ut vitae metus eget elit mattis varius quis a ex. Nam bibendum felis ac euismod dapibus.', 'Nulla justo justo, molestie non convallis eu, mollis ut orci. Phasellus non posuere leo, nec pretium enim.', 8.55, 8.55, 8.55, FALSE, 14, 210);
 
 -- INSERT INTO product_categories (product_id, category_id) VALUES (8, 1);
 INSERT INTO product_media (product_id, media_id) VALUES (8, 8);

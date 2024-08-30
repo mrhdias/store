@@ -1,11 +1,10 @@
 //
-// Last Modification: 2024-08-14 19:43:31
+// Last Modification: 2024-08-30 19:28:33
 //
 
 use anyhow;
 use crate::models::products;
 use crate::types;
-use crate::utils;
 
 use axum::{
     extract::{
@@ -24,7 +23,7 @@ use tera::{
 pub async fn product(
     Path(slug):Path<String>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let products_manager = products::Products::new(pool);
 
@@ -34,8 +33,6 @@ pub async fn product(
         .await {
         Ok(product) => {
             println!("select product with PgRow:\n{:?}", product);
-
-            tera.register_filter("round_and_format", utils::round_and_format_filter);
         
             let mut data = Context::new();
             data.insert("product", &product);
@@ -146,9 +143,7 @@ pub async fn product_category(
     Path(slug):Path<String>,
     Query(parameters): Query<products::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>) -> Html<String> {
-
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
+    Extension(tera): Extension<Tera>) -> Html<String> {
 
     let mut data = Context::new();
 
@@ -167,10 +162,8 @@ pub async fn product_category(
 pub async fn list(
     Query(parameters): Query<products::Parameters>,
     Extension(pool): Extension<sqlx::Pool<sqlx::Postgres>>,
-    Extension(mut tera): Extension<Tera>,
+    Extension(tera): Extension<Tera>,
 ) -> Html<String> {
-
-    tera.register_filter("round_and_format", utils::round_and_format_filter);
 
     let mut data = Context::new();
 
